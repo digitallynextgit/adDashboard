@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Read(//c/Users/Karan/Desktop/Projects/Digitally next_projects/**)",
+      "Bash(npx create-next-app@latest adauto-app --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(cp -r \"/c/Users/Karan/Desktop/Projects/Digitally next_projects/adauto-app/\"* \"/c/Users/Karan/Desktop/Projects/Digitally next_projects/adauto/\")",
+      "Bash(cp -r \"/c/Users/Karan/Desktop/Projects/Digitally next_projects/adauto-app/\".* \"/c/Users/Karan/Desktop/Projects/Digitally next_projects/adauto/\")",
+      "Bash(rm -rf \"/c/Users/Karan/Desktop/Projects/Digitally next_projects/adauto-app\")",
+      "Bash(cp adauto-app/.gitignore adauto/)",
+      "Bash(cp adauto-app/package.json adauto/)",
+      "Bash(cp adauto-app/package-lock.json adauto/)",
+      "Bash(cp adauto-app/postcss.config.mjs adauto/)",
+      "Bash(cp adauto-app/tsconfig.json adauto/)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init -d)"
+    ]
+  }
+}
