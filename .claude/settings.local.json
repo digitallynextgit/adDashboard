@@ -13,7 +13,12 @@
       "Bash(cp adauto-app/postcss.config.mjs adauto/)",
       "Bash(cp adauto-app/tsconfig.json adauto/)",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init -d)"
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx shadcn@latest add card table select badge separator -y)",
+      "Bash(npm run:*)",
+      "Bash(pip install:*)",
+      "Bash(python main.py)",
+      "Bash(python -c ':*)"
     ]
   }
 }
