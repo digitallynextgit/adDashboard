@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Circle } from "lucide-react";
+import { ArrowLeft, Circle, Download } from "lucide-react";
+import { downloadExcel } from "@/lib/export";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { DateFilter, getDateRange, getPreviousPeriod } from "@/components/dashboard/date-filter";
 import type { DateRange } from "@/components/dashboard/date-filter";
@@ -115,7 +116,34 @@ export default function CampaignDetailPage() {
             )}
           </div>
         </div>
-        <DateFilter value={dateRange} onChange={setDateRange} />
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              if (!daily.length) return;
+              const rows = daily.map((d) => ({
+                "Date": new Date(d.date).toLocaleDateString("en-IN", {
+                  day: "numeric", month: "short", year: "numeric",
+                }),
+                "Spend (₹)": d.spend,
+                "Impressions": d.impressions,
+                "Clicks": d.clicks,
+                "CTR (%)": Number(d.ctr.toFixed(2)),
+                "CPC (₹)": Number(d.cpc.toFixed(2)),
+                "Results": d.conversions,
+                "ROAS": Number(d.roas.toFixed(2)),
+              }));
+              const name = campaign?.campaign_name ?? "campaign";
+              const date = new Date().toISOString().split("T")[0];
+              downloadExcel(rows, "Daily Breakdown", `${name}_${dateRange}_${date}`);
+            }}
+            disabled={loading || daily.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+          <DateFilter value={dateRange} onChange={setDateRange} />
+        </div>
       </div>
 
       {/* Metric cards */}
