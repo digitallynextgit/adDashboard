@@ -72,7 +72,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-[1200px] mx-auto space-y-5">
       {/* Header row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-[20px] font-bold text-[#1C2B33]">
             Account Overview
@@ -81,7 +81,7 @@ export default function Dashboard() {
             Performance summary across all campaigns
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 self-end sm:self-auto">
           <button
             onClick={fetchData}
             className="p-2 rounded-lg border border-[#CED0D4] bg-white hover:bg-[#F0F2F5] transition-colors"

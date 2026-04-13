@@ -53,7 +53,8 @@ export function CampaignTable({ campaigns, loading }: CampaignTableProps) {
 
   return (
     <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-      <table className="w-full">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px]">
         <thead>
           <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
             <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">
@@ -143,6 +144,7 @@ export function CampaignTable({ campaigns, loading }: CampaignTableProps) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

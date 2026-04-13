@@ -53,14 +53,14 @@ export default function CampaignsPage() {
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-[20px] font-bold text-[#1C2B33]">Campaigns</h2>
           <p className="text-[13px] text-[#65676B] mt-0.5">
             All campaigns across connected platforms
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
           <button
             onClick={handleDownload}
             disabled={loading || filtered.length === 0}
@@ -74,6 +74,7 @@ export default function CampaignsPage() {
       </div>
 
       {/* Status filter tabs */}
+      <div className="overflow-x-auto pb-0.5">
       <div className="flex items-center gap-1 bg-white rounded-lg border border-[#E4E6EB] p-1 w-fit">
         {(["all", "active", "paused"] as const).map((status) => (
           <button
@@ -93,6 +94,7 @@ export default function CampaignsPage() {
             )}
           </button>
         ))}
+      </div>
       </div>
 
       <CampaignTable campaigns={filtered} loading={loading} />

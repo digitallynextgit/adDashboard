@@ -11,9 +11,9 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, change, prefix }: MetricCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-[#E4E6EB] p-5 hover:shadow-sm transition-shadow">
-      <p className="text-[13px] font-medium text-[#65676B] mb-1">{title}</p>
-      <p className="text-[28px] font-bold text-[#1C2B33] tracking-tight leading-tight">
+    <div className="bg-white rounded-xl border border-[#E4E6EB] p-3 sm:p-5 hover:shadow-sm transition-shadow">
+      <p className="text-[12px] sm:text-[13px] font-medium text-[#65676B] mb-1">{title}</p>
+      <p className="text-[22px] sm:text-[28px] font-bold text-[#1C2B33] tracking-tight leading-tight">
         {prefix}
         {value}
       </p>

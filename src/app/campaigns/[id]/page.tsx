@@ -87,7 +87,7 @@ export default function CampaignDetailPage() {
   return (
     <div className="max-w-[1200px] mx-auto space-y-5">
       {/* Back + Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <a
             href="/campaigns"
@@ -116,7 +116,7 @@ export default function CampaignDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 self-end sm:self-auto">
           <button
             onClick={() => {
               if (!daily.length) return;
@@ -173,7 +173,7 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Extra stats row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
         <MetricCard
           title="Impressions"
           value={totals ? totals.impressions.toLocaleString("en-IN") : "—"}
@@ -205,7 +205,8 @@ export default function CampaignDetailPage() {
               Daily Breakdown
             </h3>
           </div>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
                 <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Date</th>
@@ -256,6 +257,7 @@ export default function CampaignDetailPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
