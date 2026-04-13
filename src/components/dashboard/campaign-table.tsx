@@ -89,7 +89,8 @@ export function CampaignTable({ campaigns, loading }: CampaignTableProps) {
           {campaigns.map((c, i) => (
             <tr
               key={c.id}
-              className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA] transition-colors"
+              onClick={() => window.location.href = `/campaigns/${c.id}`}
+              className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA] transition-colors cursor-pointer"
             >
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2.5">
