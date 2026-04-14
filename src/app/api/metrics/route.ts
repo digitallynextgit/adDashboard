@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   // Aggregate daily totals
   const dailyMap = new Map<
     string,
-    { date: string; spend: number; impressions: number; clicks: number; conversions: number }
+    { date: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number }
   >();
 
   for (const m of metrics) {
@@ -70,11 +70,13 @@ export async function GET(request: NextRequest) {
       impressions: 0,
       clicks: 0,
       conversions: 0,
+      revenue: 0,
     };
     existing.spend += Number(m.spend);
     existing.impressions += Number(m.impressions);
     existing.clicks += Number(m.clicks);
     existing.conversions += Number(m.conversions);
+    existing.revenue += Number(m.roas) * Number(m.spend);
     dailyMap.set(m.date, existing);
   }
 

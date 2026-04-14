@@ -7,6 +7,7 @@ import {
   Settings,
   TrendingUp,
   Megaphone,
+  CalendarRange,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/weekly", label: "Weekly Report", icon: CalendarRange },
   { href: "/settings", label: "Sync Status", icon: Settings },
 ];
 
