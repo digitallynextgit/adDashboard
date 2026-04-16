@@ -34,5 +34,5 @@ jobs:
           META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          LOOKBACK_DAYS: '7'
+          LOOKBACK_DAYS: '30'
         run: python main.py
