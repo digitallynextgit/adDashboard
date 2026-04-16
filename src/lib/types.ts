@@ -30,7 +30,7 @@ export interface CampaignWithMetrics extends Campaign {
   total_clicks: number;
   total_impressions: number;
   avg_ctr: number;
-  avg_cpc: number;
+  cost_per_result: number;
   total_conversions: number;
   avg_roas: number;
 }

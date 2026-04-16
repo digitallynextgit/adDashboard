@@ -71,7 +71,7 @@ export async function GET(
       impressions: Number(m.impressions),
       clicks: Number(m.clicks),
       conversions: Number(m.conversions),
-      cpc: Number(m.cpc),
+      cost_per_result: Number(m.conversions) > 0 ? Number(m.spend) / Number(m.conversions) : 0,
       ctr: Number(m.ctr),
       roas: Number(m.roas),
     })),

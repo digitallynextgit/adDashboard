@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     existing.clicks += Number(m.clicks);
     existing.conversions += Number(m.conversions);
     existing.revenue += Number(m.roas) * Number(m.spend);
-    existing.reach += Number(m.reach || 0);
+    existing.reach += Number(m.reach || 0);   
     existing.purchases += Number(m.purchases || 0);
     existing.purchase_value += Number(m.purchase_value || 0);
     existing.add_to_cart += Number(m.add_to_cart || 0);

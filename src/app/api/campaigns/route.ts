@@ -63,8 +63,7 @@ export async function GET(request: NextRequest) {
     total_clicks: number;
     total_impressions: number;
     total_conversions: number;
-    roas_sum: number;
-    days: number;
+    total_revenue: number;
   }>();
 
   for (const m of metrics || []) {
@@ -73,15 +72,13 @@ export async function GET(request: NextRequest) {
       total_clicks: 0,
       total_impressions: 0,
       total_conversions: 0,
-      roas_sum: 0,
-      days: 0,
+      total_revenue: 0,
     };
     existing.total_spend += Number(m.spend);
     existing.total_clicks += Number(m.clicks);
     existing.total_impressions += Number(m.impressions);
     existing.total_conversions += Number(m.conversions);
-    existing.roas_sum += Number(m.roas);
-    existing.days += 1;
+    existing.total_revenue += Number(m.roas) * Number(m.spend);
     metricsMap.set(m.campaign_id, existing);
   }
 
@@ -97,11 +94,11 @@ export async function GET(request: NextRequest) {
       avg_ctr: m && m.total_impressions > 0
         ? (m.total_clicks / m.total_impressions) * 100
         : 0,
-      avg_cpc: m && m.total_clicks > 0
-        ? m.total_spend / m.total_clicks
+      cost_per_result: m && m.total_conversions > 0
+        ? m.total_spend / m.total_conversions
         : 0,
-      avg_roas: m && m.days > 0
-        ? m.roas_sum / m.days
+      avg_roas: m && m.total_spend > 0
+        ? m.total_revenue / m.total_spend
         : 0,
     };
   });

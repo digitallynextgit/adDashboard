@@ -6,7 +6,6 @@ import { ArrowLeft, Circle, Download } from "lucide-react";
 import { downloadExcel } from "@/lib/export";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { DateFilter, getDateRange, getPreviousPeriod } from "@/components/dashboard/date-filter";
-import type { DateRange } from "@/components/dashboard/date-filter";
 import { SpendChart } from "@/components/charts/spend-chart";
 import { ConversionsChart } from "@/components/charts/conversions-chart";
 import type { Campaign, DailyMetric } from "@/lib/types";
@@ -22,7 +21,7 @@ interface Totals {
 }
 
 interface DailyDetail extends DailyMetric {
-  cpc: number;
+  cost_per_result: number;
   ctr: number;
   roas: number;
 }
@@ -39,7 +38,8 @@ function StatusDot({ status }: { status: string }) {
 
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [dateRange, setDateRange] = useState<DateRange>("7d");
+  const [start, setStart] = useState(() => getDateRange("7d").start);
+  const [end,   setEnd]   = useState(() => getDateRange("7d").end);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [daily, setDaily] = useState<DailyDetail[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
@@ -48,8 +48,7 @@ export default function CampaignDetailPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { start, end } = getDateRange(dateRange);
-    const prev = getPreviousPeriod(dateRange);
+    const prev = getPreviousPeriod(start, end);
 
     const [currentRes, prevRes] = await Promise.all([
       fetch(`/api/campaigns/${id}/metrics?start_date=${start}&end_date=${end}`),
@@ -66,7 +65,7 @@ export default function CampaignDetailPage() {
     const pt = prevData.totals;
     setPrevTotals(pt && pt.spend !== undefined ? pt : null);
     setLoading(false);
-  }, [id, dateRange]);
+  }, [id, start, end]);
 
   useEffect(() => {
     fetchData();
@@ -128,13 +127,13 @@ export default function CampaignDetailPage() {
                 "Impressions": d.impressions,
                 "Clicks": d.clicks,
                 "CTR (%)": Number(d.ctr.toFixed(2)),
-                "CPC (₹)": Number(d.cpc.toFixed(2)),
+                "Cost per Result (₹)": Number(d.cost_per_result.toFixed(2)),
                 "Results": d.conversions,
                 "ROAS": Number(d.roas.toFixed(2)),
               }));
               const name = campaign?.campaign_name ?? "campaign";
               const date = new Date().toISOString().split("T")[0];
-              downloadExcel(rows, "Daily Breakdown", `${name}_${dateRange}_${date}`);
+              downloadExcel(rows, "Daily Breakdown", `${name}_${start}_${end}_${date}`);
             }}
             disabled={loading || daily.length === 0}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -142,7 +141,7 @@ export default function CampaignDetailPage() {
             <Download className="h-3.5 w-3.5" />
             Export
           </button>
-          <DateFilter value={dateRange} onChange={setDateRange} />
+          <DateFilter start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
         </div>
       </div>
 
@@ -161,8 +160,8 @@ export default function CampaignDetailPage() {
         />
         <MetricCard
           title="Cost per Result"
-          value={totals ? totals.cpc.toFixed(2) : "—"}
-          change={totals && prevTotals ? calcChange(totals.cpc, prevTotals.cpc) : null}
+          value={totals && totals.conversions > 0 ? (totals.spend / totals.conversions).toFixed(2) : "—"}
+          change={totals && prevTotals && prevTotals.conversions > 0 ? calcChange(totals.spend / totals.conversions, prevTotals.spend / prevTotals.conversions) : null}
           prefix="₹"
         />
         <MetricCard
@@ -173,7 +172,7 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Extra stats row */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard
           title="Impressions"
           value={totals ? totals.impressions.toLocaleString("en-IN") : "—"}
@@ -214,7 +213,7 @@ export default function CampaignDetailPage() {
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Clicks</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPC</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Cost / Result</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Results</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
               </tr>
@@ -245,7 +244,7 @@ export default function CampaignDetailPage() {
                     {d.ctr.toFixed(2)}%
                   </td>
                   <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                    ₹{d.cpc.toFixed(2)}
+                    ₹{d.cost_per_result.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] font-medium tabular-nums">
                     {d.conversions}

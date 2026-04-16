@@ -21,17 +21,6 @@ export function Header({ onMenuClick }: HeaderProps) {
           Ads Reporting
         </h2>
       </div>
-      <div className="flex items-center gap-2">
-        <button className="p-2 rounded-full hover:bg-[#F0F2F5] transition-colors">
-          <Search className="h-5 w-5 text-[#65676B]" />
-        </button>
-        <button className="p-2 rounded-full hover:bg-[#F0F2F5] transition-colors">
-          <Bell className="h-5 w-5 text-[#65676B]" />
-        </button>
-        <button className="p-2 rounded-full hover:bg-[#F0F2F5] transition-colors">
-          <CircleUser className="h-5 w-5 text-[#65676B]" />
-        </button>
-      </div>
     </header>
   );
 }

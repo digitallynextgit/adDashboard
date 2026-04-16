@@ -53,8 +53,21 @@ interface AudienceRow {
   spend_share: number;
 }
 
+interface SkuData {
+  variant_id: string;
+  product_title: string;
+  variant_title: string;
+  sku: string;
+  orders_count: number;
+  units_sold: number;
+  revenue: number;
+  aov: number;
+  revenue_share: number;
+}
+
 interface WeekSummary {
   label: string;
+  weekStartKey: string;  // YYYY-MM-DD Monday date for lookups
   startDate: string;
   endDate: string;
   spend: number;
@@ -144,6 +157,7 @@ function buildWeekSummary(days: DailyData[], label: string, monday: Date, isCurr
 
   return {
     label,
+    weekStartKey: fmtDateKey(monday),
     startDate: fmtDateShort(monday),
     endDate: fmtDateShort(sunday),
     spend, impressions, clicks, conversions, revenue, reach,
@@ -212,6 +226,9 @@ export default function WeeklyReportPage() {
   const [creatives, setCreatives] = useState<CreativeData[]>([]);
   const [ageGender, setAgeGender] = useState<AudienceRow[]>([]);
   const [regions, setRegions] = useState<AudienceRow[]>([]);
+  const [skus, setSkus] = useState<SkuData[]>([]);
+  const [shopifyTotals, setShopifyTotals] = useState<{ revenue: number; units_sold: number; orders_count: number; aov: number } | null>(null);
+  const [plannedSpend, setPlannedSpend] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [numWeeks, setNumWeeks] = useState(5);
 
@@ -225,18 +242,22 @@ export default function WeeklyReportPage() {
     const startStr = fmtDateKey(startDate);
     const endStr = fmtDateKey(now);
 
-    const [metricsRes, creativesRes, ageRes, regionRes] = await Promise.all([
+    const [metricsRes, creativesRes, ageRes, regionRes, shopifyRes, plannedRes] = await Promise.all([
       fetch(`/api/metrics?start_date=${startStr}&end_date=${endStr}`),
       fetch(`/api/creatives?start_date=${startStr}&end_date=${endStr}&limit=10`),
       fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=age_gender`),
       fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=region`),
+      fetch(`/api/shopify/sales?start_date=${startStr}&end_date=${endStr}`),
+      fetch(`/api/planned-spend?start_date=${startStr}&end_date=${endStr}`),
     ]);
 
-    const [metricsData, creativesData, ageData, regionData] = await Promise.all([
+    const [metricsData, creativesData, ageData, regionData, shopifyData, plannedData] = await Promise.all([
       metricsRes.json(),
       creativesRes.json(),
       ageRes.json(),
       regionRes.json(),
+      shopifyRes.json(),
+      plannedRes.json(),
     ]);
 
     const daily: DailyData[] = metricsData.daily || [];
@@ -263,6 +284,16 @@ export default function WeeklyReportPage() {
     setCreatives(creativesData.creatives || []);
     setAgeGender(ageData.breakdown || []);
     setRegions(regionData.breakdown || []);
+    setSkus(shopifyData.skus || []);
+    setShopifyTotals(shopifyData.totals || null);
+
+    // Build planned spend map: week_start → amount
+    const pMap: Record<string, number> = {};
+    for (const p of (plannedData.planned_spend || [])) {
+      pMap[p.week_start] = Number(p.planned_spend);
+    }
+    setPlannedSpend(pMap);
+
     setLoading(false);
   }, [numWeeks]);
 
@@ -575,6 +606,140 @@ export default function WeeklyReportPage() {
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Product Performance (Shopify) */}
+      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Product Performance</h3>
+            <p className="text-[12px] text-[#8A8D91] mt-0.5">
+              Units sold by SKU from Shopify
+              {shopifyTotals && shopifyTotals.orders_count > 0 && (
+                <span className="ml-2 text-[#1C2B33]">
+                  · {shopifyTotals.orders_count} orders · AOV {fmtCurrency(shopifyTotals.aov)}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        {skus.length === 0 ? (
+          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+            No Shopify data yet — add credentials in <code className="bg-[#F0F2F5] px-1.5 py-0.5 rounded text-[12px]">scripts/.env</code> and trigger a sync.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Product</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">SKU</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Units Sold</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Orders</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Revenue</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">AOV</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Rev Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skus.map((s, i) => (
+                  <tr key={s.variant_id} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+                    <td className="px-4 py-3 text-[13px] text-[#8A8D91]">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-[13px] font-medium text-[#1C2B33] line-clamp-1 max-w-[200px]">{s.product_title}</div>
+                      {s.variant_title && s.variant_title !== "Default Title" && (
+                        <div className="text-[12px] text-[#65676B]">{s.variant_title}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[13px] text-[#65676B] font-mono">{s.sku || "—"}</td>
+                    <td className="px-4 py-3 text-right text-[14px] font-bold text-[#1C2B33] tabular-nums">{fmtNum(s.units_sold)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtNum(s.orders_count)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(s.revenue)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(s.aov)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, s.revenue_share)}px`, maxWidth: "60px" }} />
+                        <span className="text-[12px] text-[#65676B] tabular-nums">{s.revenue_share.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Planned vs Actual Spend */}
+      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Planned vs Actual Spend</h3>
+            <p className="text-[12px] text-[#8A8D91] mt-0.5">Set planned spend per week in Settings</p>
+          </div>
+          <a
+            href="/settings"
+            className="text-[12px] text-[#1877F2] font-medium hover:underline"
+          >
+            Edit planned →
+          </a>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[540px]">
+            <thead>
+              <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
+                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Week</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Planned</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Actual</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Variance</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Utilisation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weeks.map((w) => {
+                const planned = plannedSpend[w.weekStartKey] ?? 0;
+                const actual = w.spend;
+                const variance = actual - planned;
+                const utilisation = planned > 0 ? (actual / planned) * 100 : null;
+                const isOver = variance > 0;
+                return (
+                  <tr
+                    key={w.label}
+                    className={`border-b border-[#E4E6EB] last:border-0 ${w.isCurrent ? "bg-[#EBF5FF]/40" : "hover:bg-[#F8F9FA]"}`}
+                  >
+                    <td className="px-4 py-3.5">
+                      <span className={`text-[13px] font-medium ${w.isCurrent ? "text-[#1877F2]" : "text-[#1C2B33]"}`}>{w.label}</span>
+                      <div className="text-[12px] text-[#65676B]">{w.startDate} – {w.endDate}</div>
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[13px] text-[#1C2B33] tabular-nums">
+                      {planned > 0 ? fmtCurrency(planned) : <span className="text-[#8A8D91]">Not set</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[13px] font-medium text-[#1C2B33] tabular-nums">{fmtCurrency(actual)}</td>
+                    <td className="px-4 py-3.5 text-right text-[13px] tabular-nums">
+                      {planned > 0 ? (
+                        <span className={isOver ? "text-[#E41E3F]" : "text-[#31A24C]"}>
+                          {isOver ? "+" : ""}{fmtCurrency(variance)}
+                        </span>
+                      ) : (
+                        <span className="text-[#8A8D91]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[13px] tabular-nums">
+                      {utilisation !== null ? (
+                        <span className={utilisation > 110 ? "text-[#E41E3F] font-medium" : utilisation >= 90 ? "text-[#31A24C] font-medium" : "text-[#F7B928] font-medium"}>
+                          {utilisation.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-[#8A8D91]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 

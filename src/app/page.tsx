@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { DateFilter, getDateRange, getPreviousPeriod } from "@/components/dashboard/date-filter";
-import type { DateRange } from "@/components/dashboard/date-filter";
 import { CampaignTable } from "@/components/dashboard/campaign-table";
 import { SpendChart } from "@/components/charts/spend-chart";
 import { ConversionsChart } from "@/components/charts/conversions-chart";
@@ -21,7 +20,8 @@ interface Totals {
 }
 
 export default function Dashboard() {
-  const [dateRange, setDateRange] = useState<DateRange>("7d");
+  const [start, setStart] = useState(() => getDateRange("7d").start);
+  const [end,   setEnd]   = useState(() => getDateRange("7d").end);
   const [daily, setDaily] = useState<DailyMetric[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [prevTotals, setPrevTotals] = useState<Totals | null>(null);
@@ -31,8 +31,7 @@ export default function Dashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
-    const { start, end } = getDateRange(dateRange);
-    const prev = getPreviousPeriod(dateRange);
+    const prev = getPreviousPeriod(start, end);
 
     const [metricsRes, prevMetricsRes, campaignsRes] = await Promise.all([
       fetch(`/api/metrics?start_date=${start}&end_date=${end}`),
@@ -51,7 +50,7 @@ export default function Dashboard() {
     setPrevTotals(pt && pt.spend !== undefined ? pt : null);
     setCampaigns(campaignsData || []);
     setLoading(false);
-  }, [dateRange]);
+  }, [start, end]);
 
   useEffect(() => {
     fetchData();
@@ -89,17 +88,22 @@ export default function Dashboard() {
           >
             <RefreshCw className={`h-4 w-4 text-[#65676B] ${loading ? "animate-spin" : ""}`} />
           </button>
-          <DateFilter value={dateRange} onChange={setDateRange} />
+          <DateFilter start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
         </div>
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <MetricCard
           title="Amount Spent"
           value={totals ? formatCurrency(totals.spend) : "—"}
           change={totals && prevTotals ? calcChange(totals.spend, prevTotals.spend) : null}
           prefix="₹"
+        />
+        <MetricCard
+          title="Impressions"
+          value={totals ? totals.impressions.toLocaleString("en-IN") : "—"}
+          change={totals && prevTotals ? calcChange(totals.impressions, prevTotals.impressions) : null}
         />
         <MetricCard
           title="Results"
@@ -112,8 +116,8 @@ export default function Dashboard() {
         />
         <MetricCard
           title="Cost per Result"
-          value={totals ? totals.cpc.toFixed(2) : "—"}
-          change={totals && prevTotals ? calcChange(totals.cpc, prevTotals.cpc) : null}
+          value={totals && totals.conversions > 0 ? (totals.spend / totals.conversions).toFixed(2) : "—"}
+          change={totals && prevTotals && prevTotals.conversions > 0 ? calcChange(totals.spend / totals.conversions, prevTotals.spend / prevTotals.conversions) : null}
           prefix="₹"
         />
         <MetricCard

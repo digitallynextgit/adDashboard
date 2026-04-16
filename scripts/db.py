@@ -55,6 +55,12 @@ def bulk_upsert_audience_breakdowns(rows: list[dict]):
         ).execute()
 
 
+def bulk_upsert_shopify_sales(rows: list[dict]):
+    """Bulk upsert Shopify daily sales per SKU. Single DB call for all rows."""
+    if rows:
+        supabase.table("shopify_daily_sales").upsert(rows, on_conflict="date,variant_id").execute()
+
+
 def log_sync(platform: str, status: str, records: int, error: str | None, started_at: str, finished_at: str):
     """Log a sync run."""
     supabase.table("sync_log").insert({
