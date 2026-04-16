@@ -21,6 +21,38 @@ interface DailyData {
   video_3s_views: number;
 }
 
+interface CreativeData {
+  ad_id: string;
+  ad_name: string;
+  adset_name: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  purchases: number;
+  purchase_value: number;
+  add_to_cart: number;
+  video_3s_views: number;
+  video_thruplay: number;
+  reach: number;
+  ctr: number;
+  cpc: number;
+  roas: number;
+  cost_per_purchase: number;
+  thumb_stop_rate: number;
+}
+
+interface AudienceRow {
+  breakdown_value: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  purchases: number;
+  purchase_value: number;
+  ctr: number;
+  roas: number;
+  spend_share: number;
+}
+
 interface WeekSummary {
   label: string;
   startDate: string;
@@ -177,6 +209,9 @@ function FunnelSection({ title, children }: { title: string; children: React.Rea
 
 export default function WeeklyReportPage() {
   const [weeks, setWeeks] = useState<WeekSummary[]>([]);
+  const [creatives, setCreatives] = useState<CreativeData[]>([]);
+  const [ageGender, setAgeGender] = useState<AudienceRow[]>([]);
+  const [regions, setRegions] = useState<AudienceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [numWeeks, setNumWeeks] = useState(5);
 
@@ -187,9 +222,24 @@ export default function WeeklyReportPage() {
     const startDate = new Date(currentMonday);
     startDate.setDate(startDate.getDate() - (numWeeks - 1) * 7);
 
-    const res = await fetch(`/api/metrics?start_date=${fmtDateKey(startDate)}&end_date=${fmtDateKey(now)}`);
-    const data = await res.json();
-    const daily: DailyData[] = data.daily || [];
+    const startStr = fmtDateKey(startDate);
+    const endStr = fmtDateKey(now);
+
+    const [metricsRes, creativesRes, ageRes, regionRes] = await Promise.all([
+      fetch(`/api/metrics?start_date=${startStr}&end_date=${endStr}`),
+      fetch(`/api/creatives?start_date=${startStr}&end_date=${endStr}&limit=10`),
+      fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=age_gender`),
+      fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=region`),
+    ]);
+
+    const [metricsData, creativesData, ageData, regionData] = await Promise.all([
+      metricsRes.json(),
+      creativesRes.json(),
+      ageRes.json(),
+      regionRes.json(),
+    ]);
+
+    const daily: DailyData[] = metricsData.daily || [];
 
     const weekMap = new Map<string, DailyData[]>();
     for (const d of daily) {
@@ -210,6 +260,9 @@ export default function WeeklyReportPage() {
     });
 
     setWeeks(summaries);
+    setCreatives(creativesData.creatives || []);
+    setAgeGender(ageData.breakdown || []);
+    setRegions(regionData.breakdown || []);
     setLoading(false);
   }, [numWeeks]);
 
@@ -367,6 +420,163 @@ export default function WeeklyReportPage() {
           </div>
         </div>
       )}
+
+      {/* Creative Performance */}
+      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Creative Performance</h3>
+            <p className="text-[12px] text-[#8A8D91] mt-0.5">Top ads by spend · {numWeeks === 1 ? "This week" : `Last ${numWeeks} weeks`}</p>
+          </div>
+        </div>
+        {creatives.length === 0 ? (
+          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+            No creative data yet — sync will populate this after the migration runs.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
+              <thead>
+                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Ad Name</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Ad Set</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPP</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">TSR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creatives.map((c, i) => (
+                  <tr key={c.ad_id} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+                    <td className="px-4 py-3 text-[13px] text-[#8A8D91]">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-[13px] font-medium text-[#1C2B33] line-clamp-2 max-w-[200px] block">{c.ad_name}</span>
+                    </td>
+                    <td className="px-4 py-3 text-[13px] text-[#65676B] max-w-[150px]">
+                      <span className="line-clamp-1 block">{c.adset_name || "—"}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtCurrency(c.spend)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtNum(c.impressions)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] tabular-nums">
+                      <span className={c.ctr >= 1.5 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{c.ctr.toFixed(2)}%</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-[13px] tabular-nums">
+                      <span className={c.roas >= 2 ? "text-[#31A24C] font-medium" : c.roas > 0 && c.roas < 1 ? "text-[#E41E3F]" : "text-[#1C2B33]"}>{c.roas.toFixed(2)}x</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(c.purchases)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{c.purchases > 0 ? fmtCurrency(c.cost_per_purchase) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-[13px] tabular-nums">
+                      <span className={c.thumb_stop_rate >= 25 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{c.thumb_stop_rate.toFixed(1)}%</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Audience Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Age & Gender */}
+        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB]">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Age & Gender</h3>
+            <p className="text-[12px] text-[#8A8D91] mt-0.5">Spend share by audience segment</p>
+          </div>
+          {ageGender.length === 0 ? (
+            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+              No audience data yet — will populate after sync.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[360px]">
+                <thead>
+                  <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
+                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Segment</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Share</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ageGender.slice(0, 10).map((row) => {
+                    const [age, gender] = row.breakdown_value.split("|");
+                    return (
+                      <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+                        <td className="px-4 py-3">
+                          <div className="text-[13px] font-medium text-[#1C2B33]">{age}</div>
+                          <div className="text-[12px] text-[#65676B] capitalize">{gender}</div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(row.spend)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, row.spend_share)}px`, maxWidth: "60px" }} />
+                            <span className="text-[12px] text-[#65676B] tabular-nums">{row.spend_share.toFixed(1)}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{row.ctr.toFixed(2)}%</td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Top Regions */}
+        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB]">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Top Regions</h3>
+            <p className="text-[12px] text-[#8A8D91] mt-0.5">Spend and conversions by state/city</p>
+          </div>
+          {regions.length === 0 ? (
+            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+              No region data yet — will populate after sync.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[340px]">
+                <thead>
+                  <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
+                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Region</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Share</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regions.slice(0, 10).map((row) => (
+                    <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+                      <td className="px-4 py-3 text-[13px] font-medium text-[#1C2B33]">{row.breakdown_value}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(row.spend)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, row.spend_share)}px`, maxWidth: "60px" }} />
+                          <span className="text-[12px] text-[#65676B] tabular-nums">{row.spend_share.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
+                      <td className="px-4 py-3 text-right text-[13px] tabular-nums">
+                        <span className={row.roas >= 2 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{row.roas > 0 ? `${row.roas.toFixed(2)}x` : "—"}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Week-by-Week Comparison Table */}
       <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">

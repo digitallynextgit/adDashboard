@@ -6,7 +6,7 @@ from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
 
 from config import META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, LOOKBACK_DAYS
-from db import upsert_campaign, upsert_metrics
+from db import upsert_campaign, upsert_metrics, upsert_ad_creative, upsert_audience_breakdown
 from utils import get_date_range, logger
 
 # Meta campaign status mapping
@@ -57,6 +57,136 @@ def _get_video_metric(video_actions: list) -> int:
     return total
 
 
+def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: str) -> int:
+    """Extract per-ad daily insights for a campaign. Returns number of records synced."""
+    records = 0
+    try:
+        ad_insights = campaign.get_insights(
+            fields=[
+                "ad_id",
+                "ad_name",
+                "adset_id",
+                "adset_name",
+                "spend",
+                "impressions",
+                "clicks",
+                "ctr",
+                "reach",
+                "actions",
+                "action_values",
+                "video_thruplay_watched_actions",
+            ],
+            params={
+                "time_range": {"since": start_date, "until": end_date},
+                "time_increment": 1,
+                "level": "ad",
+            },
+        )
+
+        for day in ad_insights:
+            date = day["date_start"]
+            ad_id = day.get("ad_id", "")
+            ad_name = day.get("ad_name", "")
+            adset_id = day.get("adset_id", "")
+            adset_name = day.get("adset_name", "")
+
+            spend = float(day.get("spend", 0))
+            impressions = int(day.get("impressions", 0))
+            clicks = int(day.get("clicks", 0))
+            ctr = float(day.get("ctr", 0))
+            reach = int(day.get("reach", 0))
+
+            actions = day.get("actions", [])
+            action_values = day.get("action_values", [])
+
+            purchases = _get_action_value(actions, PURCHASE_TYPES)
+            purchase_revenue = _get_action_revenue(action_values, PURCHASE_TYPES)
+            add_to_cart = _get_action_value(actions, {"add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"})
+            landing_page_views = _get_action_value(actions, {"landing_page_view"})
+            video_3s_views = _get_action_value(actions, {"video_view"})
+            video_thruplay = _get_video_metric(day.get("video_thruplay_watched_actions", []))
+            roas = purchase_revenue / spend if spend > 0 else 0
+
+            upsert_ad_creative(campaign_uuid, ad_id, ad_name, adset_id, adset_name, date, {
+                "spend": spend,
+                "impressions": impressions,
+                "clicks": clicks,
+                "ctr": ctr,
+                "reach": reach,
+                "purchases": purchases,
+                "purchase_value": purchase_revenue,
+                "roas": roas,
+                "add_to_cart": add_to_cart,
+                "landing_page_views": landing_page_views,
+                "video_3s_views": video_3s_views,
+                "video_thruplay": video_thruplay,
+            })
+            records += 1
+
+    except Exception as e:
+        logger.warning(f"  Ad-level extraction failed for campaign {campaign_uuid}: {e}")
+
+    return records
+
+
+def _extract_audience(campaign, campaign_uuid: str, start_date: str, end_date: str) -> int:
+    """Extract audience breakdowns (age/gender and region) for a campaign. Returns records synced."""
+    records = 0
+
+    breakdown_configs = [
+        ("age_gender", ["age", "gender"]),
+        ("region", ["region"]),
+    ]
+
+    for breakdown_type, breakdown_params in breakdown_configs:
+        try:
+            insights = campaign.get_insights(
+                fields=[
+                    "spend",
+                    "impressions",
+                    "clicks",
+                    "actions",
+                    "action_values",
+                ],
+                params={
+                    "time_range": {"since": start_date, "until": end_date},
+                    "time_increment": 1,
+                    "breakdowns": breakdown_params,
+                },
+            )
+
+            for day in insights:
+                date = day["date_start"]
+                spend = float(day.get("spend", 0))
+                impressions = int(day.get("impressions", 0))
+                clicks = int(day.get("clicks", 0))
+                actions = day.get("actions", [])
+                action_values = day.get("action_values", [])
+                purchases = _get_action_value(actions, PURCHASE_TYPES)
+                purchase_value = _get_action_revenue(action_values, PURCHASE_TYPES)
+
+                if breakdown_type == "age_gender":
+                    age = day.get("age", "unknown")
+                    gender = day.get("gender", "unknown")
+                    breakdown_value = f"{age}|{gender}"
+                else:
+                    breakdown_value = day.get("region", "unknown")
+
+                upsert_audience_breakdown(campaign_uuid, date, breakdown_type, breakdown_value, {
+                    "spend": spend,
+                    "impressions": impressions,
+                    "clicks": clicks,
+                    "purchases": purchases,
+                    "purchase_value": purchase_value,
+                })
+                records += 1
+
+        except Exception as e:
+            logger.warning(f"  Audience breakdown ({breakdown_type}) failed for campaign {campaign_uuid}: {e}")
+
+    return records
+
+
 def extract_meta_ads() -> int:
     """Extract campaign metrics from Meta Ads API. Returns number of records synced."""
     logger.info("Initializing Meta Ads API...")
@@ -95,7 +225,7 @@ def extract_meta_ads() -> int:
             status=status,
         )
 
-        # Fetch insights with expanded fields
+        # --- Campaign-level daily insights ---
         insights = campaign.get_insights(
             fields=[
                 "spend",
@@ -188,6 +318,16 @@ def extract_meta_ads() -> int:
                 "video_3s_views": video_3s_views,
             })
             records_synced += 1
+
+        # --- Ad-level insights ---
+        ad_records = _extract_ad_level(campaign, campaign_uuid, start_date, end_date)
+        records_synced += ad_records
+        logger.info(f"  Ad-level: {ad_records} records")
+
+        # --- Audience breakdowns ---
+        audience_records = _extract_audience(campaign, campaign_uuid, start_date, end_date)
+        records_synced += audience_records
+        logger.info(f"  Audience breakdowns: {audience_records} records")
 
         logger.info(f"  Synced data for {campaign_name}")
 
