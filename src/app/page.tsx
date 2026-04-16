@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { DateFilter, getDateRange, getPreviousPeriod } from "@/components/dashboard/date-filter";
 import { CampaignTable } from "@/components/dashboard/campaign-table";
@@ -22,39 +22,46 @@ interface Totals {
 export default function Dashboard() {
   const [start, setStart] = useState(() => getDateRange("7d").start);
   const [end,   setEnd]   = useState(() => getDateRange("7d").end);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [daily, setDaily] = useState<DailyMetric[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [prevTotals, setPrevTotals] = useState<Totals | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-
-    const prev = getPreviousPeriod(start, end);
-
-    const [metricsRes, prevMetricsRes, campaignsRes] = await Promise.all([
-      fetch(`/api/metrics?start_date=${start}&end_date=${end}`),
-      fetch(`/api/metrics?start_date=${prev.start}&end_date=${prev.end}`),
-      fetch(`/api/campaigns?start_date=${start}&end_date=${end}`),
-    ]);
-
-    const metricsData = await metricsRes.json();
-    const prevMetricsData = await prevMetricsRes.json();
-    const campaignsData = await campaignsRes.json();
-
-    setDaily(metricsData.daily || []);
-    const t = metricsData.totals;
-    setTotals(t && t.spend !== undefined ? t : null);
-    const pt = prevMetricsData.totals;
-    setPrevTotals(pt && pt.spend !== undefined ? pt : null);
-    setCampaigns(campaignsData || []);
-    setLoading(false);
-  }, [start, end]);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      const prev = getPreviousPeriod(start, end);
+
+      const [metricsRes, prevMetricsRes, campaignsRes] = await Promise.all([
+        fetch(`/api/metrics?start_date=${start}&end_date=${end}`),
+        fetch(`/api/metrics?start_date=${prev.start}&end_date=${prev.end}`),
+        fetch(`/api/campaigns?start_date=${start}&end_date=${end}`),
+      ]);
+
+      if (cancelled) return;
+
+      const metricsData = await metricsRes.json();
+      const prevMetricsData = await prevMetricsRes.json();
+      const campaignsData = await campaignsRes.json();
+
+      if (cancelled) return;
+
+      setDaily(metricsData.daily || []);
+      const t = metricsData.totals;
+      setTotals(t && t.spend !== undefined ? t : null);
+      const pt = prevMetricsData.totals;
+      setPrevTotals(pt && pt.spend !== undefined ? pt : null);
+      setCampaigns(campaignsData || []);
+      setLoading(false);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [start, end, refreshKey]);
 
   function calcChange(current: number, previous: number): number | null {
     if (!prevTotals || previous === 0) return null;
@@ -69,11 +76,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-5">
+    <div className="max-w-300 mx-auto space-y-5">
       {/* Header row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-bold text-[#1C2B33]">
+          <h2 className="text-[20px] font-bold text-meta-dark">
             Account Overview
           </h2>
           <p className="text-[13px] text-[#65676B] mt-0.5">
@@ -82,8 +89,8 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <button
-            onClick={fetchData}
-            className="p-2 rounded-lg border border-[#CED0D4] bg-white hover:bg-[#F0F2F5] transition-colors"
+            onClick={() => setRefreshKey(k => k + 1)}
+            className="p-2 rounded-lg border border-[#CED0D4] bg-white hover:bg-meta-sidebar transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 text-[#65676B] ${loading ? "animate-spin" : ""}`} />
@@ -136,7 +143,7 @@ export default function Dashboard() {
       {/* Campaign table */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[16px] font-semibold text-[#1C2B33]">
+          <h3 className="text-[16px] font-semibold text-meta-dark">
             Campaigns
           </h3>
           <span className="text-[13px] text-[#65676B]">

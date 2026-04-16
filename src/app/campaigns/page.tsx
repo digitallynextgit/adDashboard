@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { DateFilter, getDateRange } from "@/components/dashboard/date-filter";
 import { CampaignTable } from "@/components/dashboard/campaign-table";
@@ -16,19 +16,24 @@ export default function CampaignsPage() {
   const [currentPage , setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(
-      `/api/campaigns?start_date=${start}&end_date=${end}`
-    );
-    const data = await res.json();
-    setCampaigns(data || []);
-    setLoading(false);
-  }, [start, end]);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      const res = await fetch(
+        `/api/campaigns?start_date=${start}&end_date=${end}`
+      );
+      if (cancelled) return;
+      const data = await res.json();
+      if (cancelled) return;
+      setCampaigns(data || []);
+      setLoading(false);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [start, end]);
 
   const filtered =
     filter === "all"
@@ -62,10 +67,10 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-5">
+    <div className="max-w-300 mx-auto space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-bold text-[#1C2B33]">Campaigns</h2>
+          <h2 className="text-[20px] font-bold text-meta-dark">Campaigns</h2>
           <p className="text-[13px] text-[#65676B] mt-0.5">
             All campaigns across connected platforms
           </p>
@@ -74,7 +79,7 @@ export default function CampaignsPage() {
           <button
             onClick={handleDownload}
             disabled={loading || filtered.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-meta-dark hover:bg-meta-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-3.5 w-3.5" />
             Export
@@ -92,8 +97,8 @@ export default function CampaignsPage() {
             onClick={() => { setFilter(status); setCurrentPage(1); }}
             className={`px-4 py-1.5 rounded-md text-[13px] font-medium capitalize transition-colors ${
               filter === status
-                ? "bg-[#1877F2] text-white"
-                : "text-[#65676B] hover:bg-[#F0F2F5]"
+                ? "bg-meta-blue text-white"
+                : "text-[#65676B] hover:bg-meta-sidebar"
             }`}
           >
             {status}
@@ -115,7 +120,7 @@ export default function CampaignsPage() {
         <button
           onClick={() => setCurrentPage(p => p - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] text-meta-dark hover:bg-meta-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Prev
         </button>
@@ -125,8 +130,8 @@ export default function CampaignsPage() {
             onClick={() => setCurrentPage(page)}
             className={`w-8 h-8 rounded-lg text-[13px] font-medium transition-colors ${
               page === currentPage
-                ? "bg-[#1877F2] text-white"
-                : "border border-[#CED0D4] bg-white text-[#1C2B33] hover:bg-[#F0F2F5]"
+                ? "bg-meta-blue text-white"
+                : "border border-[#CED0D4] bg-white text-meta-dark hover:bg-meta-sidebar"
             }`}
           >
             {page}
@@ -135,7 +140,7 @@ export default function CampaignsPage() {
         <button
           onClick={() => setCurrentPage(p => p + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] text-meta-dark hover:bg-meta-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Next
         </button>

@@ -55,7 +55,7 @@ export function CampaignTable({ campaigns, loading , startIndex = 0}: CampaignTa
   return (
     <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[600px]">
+      <table className="w-full min-w-150">
         <thead>
           <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
             <th className="text-left px-4 py-3 text-[11px] sm:text-[12px] font-semibold text-[#65676B] uppercase tracking-wide w-8 sm:w-10">
@@ -109,7 +109,7 @@ export function CampaignTable({ campaigns, loading , startIndex = 0}: CampaignTa
                     {c.campaign_name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-[13px] sm:text-[14px] font-medium text-[#1C2B33] max-w-[120px] sm:max-w-[200px] truncate">
+                    <p className="text-[13px] sm:text-[14px] font-medium text-meta-dark max-w-30 sm:max-w-50 truncate">
                       {c.campaign_name}
                     </p>
                     <p className="text-[11px] text-[#8A8D91] capitalize">
@@ -121,30 +121,30 @@ export function CampaignTable({ campaigns, loading , startIndex = 0}: CampaignTa
               <td className="px-2 sm:px-4 py-3 sm:py-3.5">
                 <div className="flex items-center gap-1.5">
                   <StatusDot status={c.status} />
-                  <span className="text-[13px] text-[#1C2B33] capitalize">
+                  <span className="text-[13px] text-meta-dark capitalize">
                     {c.status}
                   </span>
                 </div>
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] font-medium tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark font-medium tabular-nums">
                 {formatCurrency(c.total_spend)}
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark tabular-nums">
                 {formatNumber(c.total_impressions)}
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark tabular-nums">
                 {formatNumber(c.total_clicks)}
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark tabular-nums">
                 {c.avg_ctr.toFixed(2)}%
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark tabular-nums">
                 {formatCurrency(c.cost_per_result)}
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] font-medium tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark font-medium tabular-nums">
                 {formatNumber(c.total_conversions)}
               </td>
-              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-[#1C2B33] tabular-nums">
+              <td className="px-2 sm:px-4 py-3 sm:py-3.5 text-right text-[13px] sm:text-[14px] text-meta-dark tabular-nums">
                 {c.avg_roas.toFixed(2)}x
               </td>
             </tr>
