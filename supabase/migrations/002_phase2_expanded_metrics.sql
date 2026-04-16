@@ -1,0 +1,17 @@
+-- Phase 2: Expanded metrics for funnel tracking
+-- Run this in Supabase SQL Editor (Dashboard > SQL Editor > New Query)
+
+ALTER TABLE campaign_metrics
+ADD COLUMN reach BIGINT NOT NULL DEFAULT 0,
+ADD COLUMN frequency DECIMAL(8,4) NOT NULL DEFAULT 0,
+ADD COLUMN cpm DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN purchases INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN purchase_value DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN cost_per_purchase DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN add_to_cart INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN cost_per_add_to_cart DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN initiate_checkout INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN cost_per_initiate_checkout DECIMAL(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN landing_page_views INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN video_thruplay INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN video_3s_views INTEGER NOT NULL DEFAULT 0;

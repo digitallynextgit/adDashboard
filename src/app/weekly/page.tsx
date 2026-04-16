@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Download, TrendingUp, TrendingDown } from "lucide-react";
-import { MetricCard } from "@/components/dashboard/metric-card";
 import { downloadExcel } from "@/lib/export";
 
 interface DailyData {
@@ -12,6 +11,14 @@ interface DailyData {
   clicks: number;
   conversions: number;
   revenue: number;
+  reach: number;
+  purchases: number;
+  purchase_value: number;
+  add_to_cart: number;
+  initiate_checkout: number;
+  landing_page_views: number;
+  video_thruplay: number;
+  video_3s_views: number;
 }
 
 interface WeekSummary {
@@ -23,22 +30,24 @@ interface WeekSummary {
   clicks: number;
   conversions: number;
   revenue: number;
+  reach: number;
   cpc: number;
   ctr: number;
+  cpm: number;
+  frequency: number;
   roas: number;
+  purchases: number;
+  purchase_value: number;
+  cost_per_purchase: number;
+  add_to_cart: number;
+  cost_per_add_to_cart: number;
+  initiate_checkout: number;
+  cost_per_initiate_checkout: number;
+  landing_page_views: number;
+  video_thruplay: number;
+  video_3s_views: number;
+  thumb_stop_rate: number;
   isCurrent: boolean;
-}
-
-interface CumulativeDay {
-  date: string;
-  dayLabel: string;
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-  cpc: number;
-  ctr: number;
-  roas: number;
 }
 
 function getMonday(date: Date): Date {
@@ -54,19 +63,19 @@ function parseDate(str: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function formatDateShort(date: Date): string {
+function fmtDateShort(date: Date): string {
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
+function fmtDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatNumber(value: number): string {
+function fmtCurrency(value: number): string {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
+
+function fmtNum(value: number): string {
   return new Intl.NumberFormat("en-IN").format(value);
 }
 
@@ -75,7 +84,6 @@ function WowBadge({ current, previous, invert }: { current: number; previous: nu
   const change = ((current - previous) / previous) * 100;
   const isPositive = change > 0;
   const isGood = invert ? !isPositive : isPositive;
-
   return (
     <span className={`inline-flex items-center gap-0.5 text-[12px] font-medium ${isGood ? "text-[#31A24C]" : "text-[#E41E3F]"}`}>
       {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -84,107 +92,124 @@ function WowBadge({ current, previous, invert }: { current: number; previous: nu
   );
 }
 
+function buildWeekSummary(days: DailyData[], label: string, monday: Date, isCurrent: boolean): WeekSummary {
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+
+  const spend = days.reduce((s, d) => s + d.spend, 0);
+  const impressions = days.reduce((s, d) => s + d.impressions, 0);
+  const clicks = days.reduce((s, d) => s + d.clicks, 0);
+  const conversions = days.reduce((s, d) => s + d.conversions, 0);
+  const revenue = days.reduce((s, d) => s + d.revenue, 0);
+  const reach = days.reduce((s, d) => s + d.reach, 0);
+  const purchases = days.reduce((s, d) => s + d.purchases, 0);
+  const purchaseValue = days.reduce((s, d) => s + d.purchase_value, 0);
+  const addToCart = days.reduce((s, d) => s + d.add_to_cart, 0);
+  const initiateCheckout = days.reduce((s, d) => s + d.initiate_checkout, 0);
+  const landingPageViews = days.reduce((s, d) => s + d.landing_page_views, 0);
+  const videoThruplay = days.reduce((s, d) => s + d.video_thruplay, 0);
+  const video3sViews = days.reduce((s, d) => s + d.video_3s_views, 0);
+
+  return {
+    label,
+    startDate: fmtDateShort(monday),
+    endDate: fmtDateShort(sunday),
+    spend, impressions, clicks, conversions, revenue, reach,
+    cpc: clicks > 0 ? spend / clicks : 0,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+    frequency: reach > 0 ? impressions / reach : 0,
+    roas: spend > 0 ? revenue / spend : 0,
+    purchases,
+    purchase_value: purchaseValue,
+    cost_per_purchase: purchases > 0 ? spend / purchases : 0,
+    add_to_cart: addToCart,
+    cost_per_add_to_cart: addToCart > 0 ? spend / addToCart : 0,
+    initiate_checkout: initiateCheckout,
+    cost_per_initiate_checkout: initiateCheckout > 0 ? spend / initiateCheckout : 0,
+    landing_page_views: landingPageViews,
+    video_thruplay: videoThruplay,
+    video_3s_views: video3sViews,
+    thumb_stop_rate: impressions > 0 ? (video3sViews / impressions) * 100 : 0,
+    isCurrent,
+  };
+}
+
+// A single comparison row for the funnel table
+function FunnelRow({ label, thisWeek, prevWeek, format, invert }: {
+  label: string;
+  thisWeek: number;
+  prevWeek: number;
+  format: "currency" | "number" | "percent" | "roas";
+  invert?: boolean;
+}) {
+  function fmtValue(v: number) {
+    if (format === "currency") return fmtCurrency(v);
+    if (format === "percent") return `${v.toFixed(2)}%`;
+    if (format === "roas") return `${v.toFixed(2)}x`;
+    return fmtNum(v);
+  }
+
+  return (
+    <tr className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+      <td className="px-4 py-3 text-[14px] text-[#1C2B33] font-medium">{label}</td>
+      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums font-medium">{fmtValue(thisWeek)}</td>
+      <td className="px-4 py-3 text-right text-[14px] text-[#65676B] tabular-nums">{fmtValue(prevWeek)}</td>
+      <td className="px-4 py-3 text-right">
+        <WowBadge current={thisWeek} previous={prevWeek} invert={invert} />
+      </td>
+    </tr>
+  );
+}
+
+function FunnelSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <tr className="bg-[#F8F9FA]">
+        <td colSpan={4} className="px-4 py-2.5 text-[12px] font-bold text-[#1877F2] uppercase tracking-wide">
+          {title}
+        </td>
+      </tr>
+      {children}
+    </>
+  );
+}
+
 export default function WeeklyReportPage() {
   const [weeks, setWeeks] = useState<WeekSummary[]>([]);
-  const [cumulativeDays, setCumulativeDays] = useState<CumulativeDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [numWeeks, setNumWeeks] = useState(5);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-
     const now = new Date();
     const currentMonday = getMonday(now);
     const startDate = new Date(currentMonday);
     startDate.setDate(startDate.getDate() - (numWeeks - 1) * 7);
-    const endDate = now;
 
-    const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
-
-    const res = await fetch(`/api/metrics?start_date=${startStr}&end_date=${endStr}`);
+    const res = await fetch(`/api/metrics?start_date=${fmtDateKey(startDate)}&end_date=${fmtDateKey(now)}`);
     const data = await res.json();
     const daily: DailyData[] = data.daily || [];
 
-    // Group by week (Monday-based)
     const weekMap = new Map<string, DailyData[]>();
     for (const d of daily) {
       const monday = getMonday(parseDate(d.date));
-      const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+      const key = fmtDateKey(monday);
       if (!weekMap.has(key)) weekMap.set(key, []);
       weekMap.get(key)!.push(d);
     }
 
-    const currentMondayStr = `${currentMonday.getFullYear()}-${String(currentMonday.getMonth() + 1).padStart(2, "0")}-${String(currentMonday.getDate()).padStart(2, "0")}`;
-
-    // Build week summaries
-    const sortedWeeks = Array.from(weekMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const currentMondayStr = fmtDateKey(currentMonday);
+    const sorted = Array.from(weekMap.entries()).sort(([a], [b]) => a.localeCompare(b));
 
     let weekNum = 1;
-    const weekSummaries: WeekSummary[] = sortedWeeks.map(([mondayStr, days]) => {
-      const totalSpend = days.reduce((s, d) => s + d.spend, 0);
-      const totalImpressions = days.reduce((s, d) => s + d.impressions, 0);
-      const totalClicks = days.reduce((s, d) => s + d.clicks, 0);
-      const totalConversions = days.reduce((s, d) => s + d.conversions, 0);
-      const totalRevenue = days.reduce((s, d) => s + d.revenue, 0);
+    const summaries = sorted.map(([mondayStr, days]) => {
       const isCurrent = mondayStr === currentMondayStr;
-
-      const monday = parseDate(mondayStr);
-      const sunday = new Date(monday);
-      sunday.setDate(sunday.getDate() + 6);
-
       const label = isCurrent ? "Current Week" : `Week ${weekNum++}`;
-
-      return {
-        label,
-        startDate: formatDateShort(monday),
-        endDate: formatDateShort(sunday),
-        spend: totalSpend,
-        impressions: totalImpressions,
-        clicks: totalClicks,
-        conversions: totalConversions,
-        revenue: totalRevenue,
-        cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
-        ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
-        roas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
-        isCurrent,
-      };
+      return buildWeekSummary(days, label, parseDate(mondayStr), isCurrent);
     });
 
-    setWeeks(weekSummaries);
-
-    // Build current week cumulative days
-    const currentDays = (weekMap.get(currentMondayStr) || []).sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
-
-    let cumSpend = 0, cumImp = 0, cumClicks = 0, cumConv = 0, cumRev = 0;
-    const cumDays: CumulativeDay[] = currentDays.map((d) => {
-      cumSpend += d.spend;
-      cumImp += d.impressions;
-      cumClicks += d.clicks;
-      cumConv += d.conversions;
-      cumRev += d.revenue;
-
-      const date = parseDate(d.date);
-      return {
-        date: d.date,
-        dayLabel: date.toLocaleDateString("en-IN", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-        }),
-        spend: cumSpend,
-        impressions: cumImp,
-        clicks: cumClicks,
-        conversions: cumConv,
-        cpc: cumClicks > 0 ? cumSpend / cumClicks : 0,
-        ctr: cumImp > 0 ? (cumClicks / cumImp) * 100 : 0,
-        roas: cumSpend > 0 ? cumRev / cumSpend : 0,
-      };
-    });
-
-    setCumulativeDays(cumDays);
+    setWeeks(summaries);
     setLoading(false);
   }, [numWeeks]);
 
@@ -195,47 +220,52 @@ export default function WeeklyReportPage() {
   const currentWeek = weeks.find((w) => w.isCurrent);
   const previousWeek = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
 
-  function calcChange(current: number, previous: number): number | null {
-    if (!previousWeek || previous === 0) return null;
-    return ((current - previous) / previous) * 100;
+  function handleExport() {
+    if (!currentWeek || !previousWeek) return;
+    const rows = [
+      { Section: "BUSINESS METRICS", Parameter: "Total Revenue (₹)", "This Week": currentWeek.purchase_value, "Previous Week": previousWeek.purchase_value },
+      { Section: "", Parameter: "Total Ad Spend (₹)", "This Week": currentWeek.spend, "Previous Week": previousWeek.spend },
+      { Section: "", Parameter: "ROAS", "This Week": Number(currentWeek.roas.toFixed(2)), "Previous Week": Number(previousWeek.roas.toFixed(2)) },
+      { Section: "", Parameter: "Cost per Purchase (₹)", "This Week": Number(currentWeek.cost_per_purchase.toFixed(2)), "Previous Week": Number(previousWeek.cost_per_purchase.toFixed(2)) },
+      { Section: "TOP OF FUNNEL", Parameter: "Impressions", "This Week": currentWeek.impressions, "Previous Week": previousWeek.impressions },
+      { Section: "", Parameter: "Reach", "This Week": currentWeek.reach, "Previous Week": previousWeek.reach },
+      { Section: "", Parameter: "CPM (₹)", "This Week": Number(currentWeek.cpm.toFixed(2)), "Previous Week": Number(previousWeek.cpm.toFixed(2)) },
+      { Section: "", Parameter: "Frequency", "This Week": Number(currentWeek.frequency.toFixed(2)), "Previous Week": Number(previousWeek.frequency.toFixed(2)) },
+      { Section: "MIDDLE OF FUNNEL", Parameter: "CTR (%)", "This Week": Number(currentWeek.ctr.toFixed(2)), "Previous Week": Number(previousWeek.ctr.toFixed(2)) },
+      { Section: "", Parameter: "CPC (₹)", "This Week": Number(currentWeek.cpc.toFixed(2)), "Previous Week": Number(previousWeek.cpc.toFixed(2)) },
+      { Section: "", Parameter: "Landing Page Views", "This Week": currentWeek.landing_page_views, "Previous Week": previousWeek.landing_page_views },
+      { Section: "", Parameter: "3s Video Views", "This Week": currentWeek.video_3s_views, "Previous Week": previousWeek.video_3s_views },
+      { Section: "", Parameter: "Thumb Stop Rate (%)", "This Week": Number(currentWeek.thumb_stop_rate.toFixed(2)), "Previous Week": Number(previousWeek.thumb_stop_rate.toFixed(2)) },
+      { Section: "BOTTOM OF FUNNEL", Parameter: "Add to Cart", "This Week": currentWeek.add_to_cart, "Previous Week": previousWeek.add_to_cart },
+      { Section: "", Parameter: "Cost per ATC (₹)", "This Week": Number(currentWeek.cost_per_add_to_cart.toFixed(2)), "Previous Week": Number(previousWeek.cost_per_add_to_cart.toFixed(2)) },
+      { Section: "", Parameter: "Initiate Checkout", "This Week": currentWeek.initiate_checkout, "Previous Week": previousWeek.initiate_checkout },
+      { Section: "", Parameter: "Purchases", "This Week": currentWeek.purchases, "Previous Week": previousWeek.purchases },
+    ];
+    const date = new Date().toISOString().split("T")[0];
+    downloadExcel(rows, "Weekly Report", `weekly_funnel_report_${date}`);
   }
 
-  function formatVal(value: number): string {
-    if (value >= 10000000) return `${(value / 10000000).toFixed(2)}Cr`;
-    if (value >= 100000) return `${(value / 100000).toFixed(2)}L`;
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-    return value.toFixed(0);
-  }
-
-  function handleExportWeeks() {
+  function handleExportWeekly() {
     const rows = weeks.map((w) => ({
       "Week": w.label,
       "Period": `${w.startDate} – ${w.endDate}`,
       "Spend (₹)": w.spend,
+      "Revenue (₹)": w.purchase_value,
+      "ROAS": Number(w.roas.toFixed(2)),
       "Impressions": w.impressions,
+      "Reach": w.reach,
       "Clicks": w.clicks,
       "CTR (%)": Number(w.ctr.toFixed(2)),
       "CPC (₹)": Number(w.cpc.toFixed(2)),
-      "Results": w.conversions,
-      "ROAS": Number(w.roas.toFixed(2)),
+      "CPM (₹)": Number(w.cpm.toFixed(2)),
+      "Purchases": w.purchases,
+      "CPP (₹)": Number(w.cost_per_purchase.toFixed(2)),
+      "Add to Cart": w.add_to_cart,
+      "Initiate Checkout": w.initiate_checkout,
+      "Landing Page Views": w.landing_page_views,
     }));
     const date = new Date().toISOString().split("T")[0];
-    downloadExcel(rows, "Weekly Summary", `weekly_report_${date}`);
-  }
-
-  function handleExportDaily() {
-    const rows = cumulativeDays.map((d) => ({
-      "Day": d.dayLabel,
-      "Spend (₹) Cumulative": d.spend,
-      "Impressions Cumulative": d.impressions,
-      "Clicks Cumulative": d.clicks,
-      "CTR (%)": Number(d.ctr.toFixed(2)),
-      "CPC (₹)": Number(d.cpc.toFixed(2)),
-      "Results Cumulative": d.conversions,
-      "ROAS": Number(d.roas.toFixed(2)),
-    }));
-    const date = new Date().toISOString().split("T")[0];
-    downloadExcel(rows, "Current Week", `current_week_progress_${date}`);
+    downloadExcel(rows, "All Weeks", `weekly_comparison_${date}`);
   }
 
   if (loading) {
@@ -253,11 +283,9 @@ export default function WeeklyReportPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-bold text-[#1C2B33]">
-            Weekly Report
-          </h2>
+          <h2 className="text-[20px] font-bold text-[#1C2B33]">Weekly Report</h2>
           <p className="text-[13px] text-[#65676B] mt-0.5">
-            Week-by-week performance &middot; Monday to Sunday
+            Performance Marketing &middot; Monday to Sunday
           </p>
         </div>
         <div className="flex items-center gap-2.5 self-end sm:self-auto">
@@ -273,31 +301,72 @@ export default function WeeklyReportPage() {
         </div>
       </div>
 
-      {/* This Week Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="This Week Spend"
-          value={currentWeek ? formatVal(currentWeek.spend) : "—"}
-          change={currentWeek && previousWeek ? calcChange(currentWeek.spend, previousWeek.spend) : null}
-          prefix="₹"
-        />
-        <MetricCard
-          title="This Week Results"
-          value={currentWeek ? formatNumber(currentWeek.conversions) : "—"}
-          change={currentWeek && previousWeek ? calcChange(currentWeek.conversions, previousWeek.conversions) : null}
-        />
-        <MetricCard
-          title="CPC"
-          value={currentWeek ? currentWeek.cpc.toFixed(2) : "—"}
-          change={currentWeek && previousWeek ? calcChange(currentWeek.cpc, previousWeek.cpc) : null}
-          prefix="₹"
-        />
-        <MetricCard
-          title="ROAS"
-          value={currentWeek ? `${currentWeek.roas.toFixed(2)}x` : "—"}
-          change={currentWeek && previousWeek ? calcChange(currentWeek.roas, previousWeek.roas) : null}
-        />
-      </div>
+      {/* This Week vs Last Week — Funnel Report */}
+      {currentWeek && previousWeek && (
+        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+            <div>
+              <h3 className="text-[15px] font-semibold text-[#1C2B33]">
+                This Week vs Previous Week
+              </h3>
+              <p className="text-[12px] text-[#8A8D91] mt-0.5">
+                {currentWeek.startDate} – today vs {previousWeek.startDate} – {previousWeek.endDate}
+              </p>
+            </div>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr className="border-b border-[#E4E6EB]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Parameter</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">This Week</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Prev Week</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">WoW</th>
+                </tr>
+              </thead>
+              <tbody>
+                <FunnelSection title="Business Metrics">
+                  <FunnelRow label="Total Revenue (₹)" thisWeek={currentWeek.purchase_value} prevWeek={previousWeek.purchase_value} format="currency" />
+                  <FunnelRow label="Total Ad Spend (₹)" thisWeek={currentWeek.spend} prevWeek={previousWeek.spend} format="currency" />
+                  <FunnelRow label="ROAS" thisWeek={currentWeek.roas} prevWeek={previousWeek.roas} format="roas" />
+                  <FunnelRow label="Cost per Purchase (₹)" thisWeek={currentWeek.cost_per_purchase} prevWeek={previousWeek.cost_per_purchase} format="currency" invert />
+                </FunnelSection>
+
+                <FunnelSection title="Top of Funnel">
+                  <FunnelRow label="Impressions" thisWeek={currentWeek.impressions} prevWeek={previousWeek.impressions} format="number" />
+                  <FunnelRow label="Reach" thisWeek={currentWeek.reach} prevWeek={previousWeek.reach} format="number" />
+                  <FunnelRow label="CPM (₹)" thisWeek={currentWeek.cpm} prevWeek={previousWeek.cpm} format="currency" invert />
+                  <FunnelRow label="Frequency" thisWeek={currentWeek.frequency} prevWeek={previousWeek.frequency} format="percent" />
+                </FunnelSection>
+
+                <FunnelSection title="Middle of Funnel">
+                  <FunnelRow label="CTR (%)" thisWeek={currentWeek.ctr} prevWeek={previousWeek.ctr} format="percent" />
+                  <FunnelRow label="CPC (₹)" thisWeek={currentWeek.cpc} prevWeek={previousWeek.cpc} format="currency" invert />
+                  <FunnelRow label="Landing Page Views" thisWeek={currentWeek.landing_page_views} prevWeek={previousWeek.landing_page_views} format="number" />
+                  <FunnelRow label="3-Second Video Views" thisWeek={currentWeek.video_3s_views} prevWeek={previousWeek.video_3s_views} format="number" />
+                  <FunnelRow label="Thumb Stop Rate (%)" thisWeek={currentWeek.thumb_stop_rate} prevWeek={previousWeek.thumb_stop_rate} format="percent" />
+                  <FunnelRow label="Video ThruPlay" thisWeek={currentWeek.video_thruplay} prevWeek={previousWeek.video_thruplay} format="number" />
+                </FunnelSection>
+
+                <FunnelSection title="Bottom of Funnel">
+                  <FunnelRow label="Add to Cart" thisWeek={currentWeek.add_to_cart} prevWeek={previousWeek.add_to_cart} format="number" />
+                  <FunnelRow label="Cost per ATC (₹)" thisWeek={currentWeek.cost_per_add_to_cart} prevWeek={previousWeek.cost_per_add_to_cart} format="currency" invert />
+                  <FunnelRow label="Initiate Checkout" thisWeek={currentWeek.initiate_checkout} prevWeek={previousWeek.initiate_checkout} format="number" />
+                  <FunnelRow label="Cost per Checkout (₹)" thisWeek={currentWeek.cost_per_initiate_checkout} prevWeek={previousWeek.cost_per_initiate_checkout} format="currency" invert />
+                  <FunnelRow label="Purchases" thisWeek={currentWeek.purchases} prevWeek={previousWeek.purchases} format="number" />
+                </FunnelSection>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Week-by-Week Comparison Table */}
       <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
@@ -306,7 +375,7 @@ export default function WeeklyReportPage() {
             Week-by-Week Comparison
           </h3>
           <button
-            onClick={handleExportWeeks}
+            onClick={handleExportWeekly}
             disabled={weeks.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40"
           >
@@ -315,18 +384,19 @@ export default function WeeklyReportPage() {
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
                 <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Week</th>
                 <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Period</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Revenue</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Reach</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Clicks</th>
                 <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPC</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Results</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPP</th>
               </tr>
             </thead>
             <tbody>
@@ -346,15 +416,23 @@ export default function WeeklyReportPage() {
                       {w.startDate} – {w.endDate}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{formatCurrency(w.spend)}</div>
+                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{fmtCurrency(w.spend)}</div>
                       {prev && <WowBadge current={w.spend} previous={prev.spend} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{formatNumber(w.impressions)}</div>
-                      {prev && <WowBadge current={w.impressions} previous={prev.impressions} />}
+                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtCurrency(w.purchase_value)}</div>
+                      {prev && <WowBadge current={w.purchase_value} previous={prev.purchase_value} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{formatNumber(w.clicks)}</div>
+                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{w.roas.toFixed(2)}x</div>
+                      {prev && <WowBadge current={w.roas} previous={prev.roas} />}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtNum(w.reach)}</div>
+                      {prev && <WowBadge current={w.reach} previous={prev.reach} />}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtNum(w.clicks)}</div>
                       {prev && <WowBadge current={w.clicks} previous={prev.clicks} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
@@ -362,16 +440,12 @@ export default function WeeklyReportPage() {
                       {prev && <WowBadge current={w.ctr} previous={prev.ctr} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{formatCurrency(w.cpc)}</div>
-                      {prev && <WowBadge current={w.cpc} previous={prev.cpc} invert />}
+                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(w.purchases)}</div>
+                      {prev && <WowBadge current={w.purchases} previous={prev.purchases} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{formatNumber(w.conversions)}</div>
-                      {prev && <WowBadge current={w.conversions} previous={prev.conversions} />}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{w.roas.toFixed(2)}x</div>
-                      {prev && <WowBadge current={w.roas} previous={prev.roas} />}
+                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtCurrency(w.cost_per_purchase)}</div>
+                      {prev && <WowBadge current={w.cost_per_purchase} previous={prev.cost_per_purchase} invert />}
                     </td>
                   </tr>
                 );
@@ -379,91 +453,6 @@ export default function WeeklyReportPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Current Week Cumulative Progress */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
-          <div>
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">
-              Current Week Progress
-            </h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">
-              Cumulative totals — each row includes all previous days
-            </p>
-          </div>
-          <button
-            onClick={handleExportDaily}
-            disabled={cumulativeDays.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </button>
-        </div>
-        {cumulativeDays.length === 0 ? (
-          <div className="p-8 text-center text-[#8A8D91] text-sm">
-            No data for this week yet
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
-              <thead>
-                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Day</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Clicks</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPC</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Results</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cumulativeDays.map((d, i) => {
-                  const isLatest = i === cumulativeDays.length - 1;
-                  return (
-                    <tr
-                      key={d.date}
-                      className={`border-b border-[#E4E6EB] last:border-0 ${isLatest ? "bg-[#EBF5FF]/40" : "hover:bg-[#F8F9FA]"}`}
-                    >
-                      <td className="px-4 py-3 text-[14px] text-[#1C2B33] font-medium whitespace-nowrap">
-                        {d.dayLabel}
-                        {isLatest && (
-                          <span className="ml-2 text-[11px] text-[#1877F2] bg-[#EBF5FF] px-1.5 py-0.5 rounded">
-                            Latest
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] font-medium tabular-nums">
-                        {formatCurrency(d.spend)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                        {formatNumber(d.impressions)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                        {formatNumber(d.clicks)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                        {d.ctr.toFixed(2)}%
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                        {formatCurrency(d.cpc)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] font-medium tabular-nums">
-                        {formatNumber(d.conversions)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
-                        {d.roas.toFixed(2)}x
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
