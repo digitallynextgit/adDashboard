@@ -18,7 +18,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # ── Fill these in ──────────────────────────────────────────────
 API_KEY    = ""   # From Dev Dashboard → AdAuto → Client credentials
 API_SECRET = ""   # From Dev Dashboard → AdAuto → Client credentials
-SHOP       = "xxvjh8-ad.myshopify.com"
+SHOP       = ""   # e.g. your-store.myshopify.com
 # ───────────────────────────────────────────────────────────────
 
 REDIRECT_URI = "http://localhost:8080/callback"
