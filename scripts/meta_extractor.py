@@ -6,7 +6,7 @@ from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
 
 from config import META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, LOOKBACK_DAYS
-from db import upsert_campaign, upsert_metrics, upsert_ad_creative, upsert_audience_breakdown
+from db import upsert_campaign, upsert_metrics, bulk_upsert_ad_creatives, bulk_upsert_audience_breakdowns
 from utils import get_date_range, logger
 
 # Meta campaign status mapping
@@ -59,7 +59,7 @@ def _get_video_metric(video_actions: list) -> int:
 
 def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: str) -> int:
     """Extract per-ad daily insights for a campaign. Returns number of records synced."""
-    records = 0
+    rows = []
     try:
         ad_insights = campaign.get_insights(
             fields=[
@@ -84,54 +84,43 @@ def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: s
         )
 
         for day in ad_insights:
-            date = day["date_start"]
-            ad_id = day.get("ad_id", "")
-            ad_name = day.get("ad_name", "")
-            adset_id = day.get("adset_id", "")
-            adset_name = day.get("adset_name", "")
-
             spend = float(day.get("spend", 0))
-            impressions = int(day.get("impressions", 0))
-            clicks = int(day.get("clicks", 0))
-            ctr = float(day.get("ctr", 0))
-            reach = int(day.get("reach", 0))
-
             actions = day.get("actions", [])
             action_values = day.get("action_values", [])
-
-            purchases = _get_action_value(actions, PURCHASE_TYPES)
             purchase_revenue = _get_action_revenue(action_values, PURCHASE_TYPES)
-            add_to_cart = _get_action_value(actions, {"add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"})
-            landing_page_views = _get_action_value(actions, {"landing_page_view"})
-            video_3s_views = _get_action_value(actions, {"video_view"})
-            video_thruplay = _get_video_metric(day.get("video_thruplay_watched_actions", []))
-            roas = purchase_revenue / spend if spend > 0 else 0
 
-            upsert_ad_creative(campaign_uuid, ad_id, ad_name, adset_id, adset_name, date, {
+            rows.append({
+                "campaign_id": campaign_uuid,
+                "ad_id": day.get("ad_id", ""),
+                "ad_name": day.get("ad_name", ""),
+                "adset_id": day.get("adset_id", ""),
+                "adset_name": day.get("adset_name", ""),
+                "date": day["date_start"],
                 "spend": spend,
-                "impressions": impressions,
-                "clicks": clicks,
-                "ctr": ctr,
-                "reach": reach,
-                "purchases": purchases,
+                "impressions": int(day.get("impressions", 0)),
+                "clicks": int(day.get("clicks", 0)),
+                "ctr": float(day.get("ctr", 0)),
+                "reach": int(day.get("reach", 0)),
+                "purchases": _get_action_value(actions, PURCHASE_TYPES),
                 "purchase_value": purchase_revenue,
-                "roas": roas,
-                "add_to_cart": add_to_cart,
-                "landing_page_views": landing_page_views,
-                "video_3s_views": video_3s_views,
-                "video_thruplay": video_thruplay,
+                "roas": purchase_revenue / spend if spend > 0 else 0,
+                "add_to_cart": _get_action_value(actions, {"add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"}),
+                "landing_page_views": _get_action_value(actions, {"landing_page_view"}),
+                "video_3s_views": _get_action_value(actions, {"video_view"}),
+                "video_thruplay": _get_video_metric(day.get("video_thruplay_watched_actions", [])),
             })
-            records += 1
+
+        bulk_upsert_ad_creatives(rows)
 
     except Exception as e:
         logger.warning(f"  Ad-level extraction failed for campaign {campaign_uuid}: {e}")
 
-    return records
+    return len(rows)
 
 
 def _extract_audience(campaign, campaign_uuid: str, start_date: str, end_date: str) -> int:
     """Extract audience breakdowns (age/gender and region) for a campaign. Returns records synced."""
-    records = 0
+    rows = []
 
     breakdown_configs = [
         ("age_gender", ["age", "gender"]),
@@ -155,36 +144,35 @@ def _extract_audience(campaign, campaign_uuid: str, start_date: str, end_date: s
                 },
             )
 
+            batch = []
             for day in insights:
-                date = day["date_start"]
-                spend = float(day.get("spend", 0))
-                impressions = int(day.get("impressions", 0))
-                clicks = int(day.get("clicks", 0))
                 actions = day.get("actions", [])
                 action_values = day.get("action_values", [])
-                purchases = _get_action_value(actions, PURCHASE_TYPES)
-                purchase_value = _get_action_revenue(action_values, PURCHASE_TYPES)
 
                 if breakdown_type == "age_gender":
-                    age = day.get("age", "unknown")
-                    gender = day.get("gender", "unknown")
-                    breakdown_value = f"{age}|{gender}"
+                    breakdown_value = f"{day.get('age', 'unknown')}|{day.get('gender', 'unknown')}"
                 else:
                     breakdown_value = day.get("region", "unknown")
 
-                upsert_audience_breakdown(campaign_uuid, date, breakdown_type, breakdown_value, {
-                    "spend": spend,
-                    "impressions": impressions,
-                    "clicks": clicks,
-                    "purchases": purchases,
-                    "purchase_value": purchase_value,
+                batch.append({
+                    "campaign_id": campaign_uuid,
+                    "date": day["date_start"],
+                    "breakdown_type": breakdown_type,
+                    "breakdown_value": breakdown_value,
+                    "spend": float(day.get("spend", 0)),
+                    "impressions": int(day.get("impressions", 0)),
+                    "clicks": int(day.get("clicks", 0)),
+                    "purchases": _get_action_value(actions, PURCHASE_TYPES),
+                    "purchase_value": _get_action_revenue(action_values, PURCHASE_TYPES),
                 })
-                records += 1
+
+            bulk_upsert_audience_breakdowns(batch)
+            rows.extend(batch)
 
         except Exception as e:
             logger.warning(f"  Audience breakdown ({breakdown_type}) failed for campaign {campaign_uuid}: {e}")
 
-    return records
+    return len(rows)
 
 
 def extract_meta_ads() -> int:
