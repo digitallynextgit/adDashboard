@@ -8,7 +8,9 @@ import sys
 from db import log_sync
 from utils import logger, now_iso
 from meta_extractor import extract_meta_ads
-from shopify_extractor import extract_shopify_sales
+from shopify_extractor import extract_shopify_sales, extract_shopify_variants
+from amazon_extractor import extract_amazon_ads
+from flipkart_extractor import extract_flipkart_ads
 
 
 def run_meta():
@@ -44,6 +46,7 @@ def run_meta():
 def run_shopify():
     started_at = now_iso()
     try:
+        extract_shopify_variants()
         records = extract_shopify_sales()
         if records > 0:
             log_sync(
@@ -78,6 +81,30 @@ def main():
         run_shopify()
     except Exception as e:
         errors.append(f"Shopify: {e}")
+
+    # Run Amazon Ads extraction (skips gracefully if credentials not set)
+    try:
+        started_at = now_iso()
+        records = extract_amazon_ads()
+        if records > 0:
+            log_sync(platform="amazon", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"Amazon: {e}")
+        log_sync(platform="amazon", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
+
+    # Run Flipkart Ads extraction (skips gracefully if credentials not set)
+    try:
+        started_at = now_iso()
+        records = extract_flipkart_ads()
+        if records > 0:
+            log_sync(platform="flipkart", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"Flipkart: {e}")
+        log_sync(platform="flipkart", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
 
     # Google Ads extraction will be added in a future phase
     # try:

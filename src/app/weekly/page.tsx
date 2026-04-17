@@ -3,6 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { Download, TrendingUp, TrendingDown } from "lucide-react";
 import { downloadExcel } from "@/lib/export";
+import { usePlatform } from "@/lib/platform-context";
+import { PlatformGate } from "@/components/dashboard/platform-gate";
+import { AmazonWeekly } from "@/components/amazon/amazon-weekly";
+import { FlipkartWeekly } from "@/components/flipkart/flipkart-weekly";
 
 interface DailyData {
   date: string;
@@ -19,6 +23,7 @@ interface DailyData {
   landing_page_views: number;
   video_thruplay: number;
   video_3s_views: number;
+  video_avg_watch_time: number;
 }
 
 interface CreativeData {
@@ -67,7 +72,7 @@ interface SkuData {
 
 interface WeekSummary {
   label: string;
-  weekStartKey: string;  // YYYY-MM-DD Monday date for lookups
+  weekStartKey: string;
   startDate: string;
   endDate: string;
   spend: number;
@@ -92,6 +97,7 @@ interface WeekSummary {
   video_thruplay: number;
   video_3s_views: number;
   thumb_stop_rate: number;
+  video_avg_watch_time: number;
   isCurrent: boolean;
 }
 
@@ -125,7 +131,7 @@ function fmtNum(value: number): string {
 }
 
 function WowBadge({ current, previous, invert }: { current: number; previous: number; invert?: boolean }) {
-  if (!previous || previous === 0) return <span className="text-[12px] text-[#8A8D91]">—</span>;
+  if (!previous || previous === 0) return <span className="text-[12px] text-[#8A8D91] dark:text-[#616161]">—</span>;
   const change = ((current - previous) / previous) * 100;
   const isPositive = change > 0;
   const isGood = invert ? !isPositive : isPositive;
@@ -154,6 +160,8 @@ function buildWeekSummary(days: DailyData[], label: string, monday: Date, isCurr
   const landingPageViews = days.reduce((s, d) => s + d.landing_page_views, 0);
   const videoThruplay = days.reduce((s, d) => s + d.video_thruplay, 0);
   const video3sViews = days.reduce((s, d) => s + d.video_3s_views, 0);
+  const watchTimeWeighted = days.reduce((s, d) => s + d.video_avg_watch_time * d.video_3s_views, 0);
+  const videoAvgWatchTime = video3sViews > 0 ? Math.round((watchTimeWeighted / video3sViews) * 100) / 100 : 0;
 
   return {
     label,
@@ -177,32 +185,38 @@ function buildWeekSummary(days: DailyData[], label: string, monday: Date, isCurr
     video_thruplay: videoThruplay,
     video_3s_views: video3sViews,
     thumb_stop_rate: impressions > 0 ? (video3sViews / impressions) * 100 : 0,
+    video_avg_watch_time: videoAvgWatchTime,
     isCurrent,
   };
 }
 
-// A single comparison row for the funnel table
 function FunnelRow({ label, thisWeek, prevWeek, format, invert }: {
   label: string;
-  thisWeek: number;
-  prevWeek: number;
-  format: "currency" | "number" | "percent" | "roas";
+  thisWeek: number | null;
+  prevWeek: number | null;
+  format: "currency" | "number" | "percent" | "roas" | "seconds";
   invert?: boolean;
 }) {
-  function fmtValue(v: number) {
+  const dash = <span className="text-[#8A8D91] dark:text-[#616161]">—</span>;
+
+  function fmtValue(v: number | null) {
+    if (v === null) return dash;
     if (format === "currency") return fmtCurrency(v);
     if (format === "percent") return `${v.toFixed(2)}%`;
     if (format === "roas") return `${v.toFixed(2)}x`;
+    if (format === "seconds") return `${v.toFixed(1)}s`;
     return fmtNum(v);
   }
 
   return (
-    <tr className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
-      <td className="px-4 py-3 text-[14px] text-[#1C2B33] font-medium">{label}</td>
-      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums font-medium">{fmtValue(thisWeek)}</td>
-      <td className="px-4 py-3 text-right text-[14px] text-[#65676B] tabular-nums">{fmtValue(prevWeek)}</td>
+    <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]">
+      <td className="px-4 py-3 text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium">{label}</td>
+      <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums font-medium">{fmtValue(thisWeek)}</td>
+      <td className="px-4 py-3 text-right text-[14px] text-[#65676B] dark:text-[#888888] tabular-nums">{fmtValue(prevWeek)}</td>
       <td className="px-4 py-3 text-right">
-        <WowBadge current={thisWeek} previous={prevWeek} invert={invert} />
+        {thisWeek !== null && prevWeek !== null
+          ? <WowBadge current={thisWeek} previous={prevWeek} invert={invert} />
+          : dash}
       </td>
     </tr>
   );
@@ -211,7 +225,7 @@ function FunnelRow({ label, thisWeek, prevWeek, format, invert }: {
 function FunnelSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <>
-      <tr className="bg-[#F8F9FA]">
+      <tr className="bg-[#F8F9FA] dark:bg-[#161616]">
         <td colSpan={4} className="px-4 py-2.5 text-[12px] font-bold text-[#1877F2] uppercase tracking-wide">
           {title}
         </td>
@@ -222,6 +236,7 @@ function FunnelSection({ title, children }: { title: string; children: React.Rea
 }
 
 export default function WeeklyReportPage() {
+  const { config } = usePlatform();
   const [weeks, setWeeks] = useState<WeekSummary[]>([]);
   const [creatives, setCreatives] = useState<CreativeData[]>([]);
   const [ageGender, setAgeGender] = useState<AudienceRow[]>([]);
@@ -231,6 +246,11 @@ export default function WeeklyReportPage() {
   const [plannedSpend, setPlannedSpend] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [numWeeks, setNumWeeks] = useState(5);
+  const [currentWeekSkus, setCurrentWeekSkus] = useState<SkuData[]>([]);
+  const [prevWeekSkus, setPrevWeekSkus] = useState<SkuData[]>([]);
+  const [currentWeekShopifyTotals, setCurrentWeekShopifyTotals] = useState<{ revenue: number; units_sold: number; orders_count: number; aov: number } | null>(null);
+  const [prevWeekShopifyTotals, setPrevWeekShopifyTotals] = useState<{ revenue: number; units_sold: number; orders_count: number; aov: number } | null>(null);
+  const [allKnownSkus, setAllKnownSkus] = useState<{ variant_id: string; product_title: string; variant_title: string; sku: string }[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -242,22 +262,36 @@ export default function WeeklyReportPage() {
     const startStr = fmtDateKey(startDate);
     const endStr = fmtDateKey(now);
 
-    const [metricsRes, creativesRes, ageRes, regionRes, shopifyRes, plannedRes] = await Promise.all([
+    const prevMonday = new Date(currentMonday);
+    prevMonday.setDate(prevMonday.getDate() - 7);
+    const prevSunday = new Date(currentMonday);
+    prevSunday.setDate(prevSunday.getDate() - 1);
+    const cwShopifyStart = fmtDateKey(currentMonday);
+    const pwShopifyStart = fmtDateKey(prevMonday);
+    const pwShopifyEnd = fmtDateKey(prevSunday);
+
+    const [metricsRes, creativesRes, ageRes, regionRes, shopifyRes, plannedRes, cwShopifyRes, pwShopifyRes, allSkusRes] = await Promise.all([
       fetch(`/api/metrics?start_date=${startStr}&end_date=${endStr}`),
       fetch(`/api/creatives?start_date=${startStr}&end_date=${endStr}&limit=10`),
       fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=age_gender`),
       fetch(`/api/audience?start_date=${startStr}&end_date=${endStr}&breakdown_type=region`),
       fetch(`/api/shopify/sales?start_date=${startStr}&end_date=${endStr}`),
       fetch(`/api/planned-spend?start_date=${startStr}&end_date=${endStr}`),
+      fetch(`/api/shopify/sales?start_date=${cwShopifyStart}&end_date=${endStr}`),
+      fetch(`/api/shopify/sales?start_date=${pwShopifyStart}&end_date=${pwShopifyEnd}`),
+      fetch(`/api/shopify/skus`),
     ]);
 
-    const [metricsData, creativesData, ageData, regionData, shopifyData, plannedData] = await Promise.all([
+    const [metricsData, creativesData, ageData, regionData, shopifyData, plannedData, cwShopifyData, pwShopifyData, allSkusData] = await Promise.all([
       metricsRes.json(),
       creativesRes.json(),
       ageRes.json(),
       regionRes.json(),
       shopifyRes.json(),
       plannedRes.json(),
+      cwShopifyRes.json(),
+      pwShopifyRes.json(),
+      allSkusRes.json(),
     ]);
 
     const daily: DailyData[] = metricsData.daily || [];
@@ -286,8 +320,15 @@ export default function WeeklyReportPage() {
     setRegions(regionData.breakdown || []);
     setSkus(shopifyData.skus || []);
     setShopifyTotals(shopifyData.totals || null);
+    setCurrentWeekSkus(cwShopifyData.skus || []);
+    setCurrentWeekShopifyTotals(cwShopifyData.totals || null);
+    setPrevWeekSkus(pwShopifyData.skus || []);
+    setPrevWeekShopifyTotals(pwShopifyData.totals || null);
+    const knownSkus: { variant_id: string; product_title: string; variant_title: string; sku: string }[] = allSkusData.skus || [];
+    // Sort by variant_title naturally so Pack of 1, 2, 3, 5, 10 appear in order
+    knownSkus.sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: "base" }));
+    setAllKnownSkus(knownSkus);
 
-    // Build planned spend map: week_start → amount
     const pMap: Record<string, number> = {};
     for (const p of (plannedData.planned_spend || [])) {
       pMap[p.week_start] = Number(p.planned_spend);
@@ -303,6 +344,24 @@ export default function WeeklyReportPage() {
 
   const currentWeek = weeks.find((w) => w.isCurrent);
   const previousWeek = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
+
+  // Merge current + prev week SKUs so all variants always appear (even if unsold this week)
+  const allFunnelSkus = (() => {
+    const seen = new Set<string>();
+    const merged: SkuData[] = [];
+    for (const sku of [...currentWeekSkus, ...prevWeekSkus]) {
+      if (!seen.has(sku.variant_id)) {
+        seen.add(sku.variant_id);
+        merged.push(sku);
+      }
+    }
+    merged.sort((a, b) => {
+      const au = currentWeekSkus.find((s) => s.variant_id === a.variant_id)?.units_sold ?? 0;
+      const bu = currentWeekSkus.find((s) => s.variant_id === b.variant_id)?.units_sold ?? 0;
+      return bu - au;
+    });
+    return merged;
+  })();
 
   function handleExport() {
     if (!currentWeek || !previousWeek) return;
@@ -352,10 +411,14 @@ export default function WeeklyReportPage() {
     downloadExcel(rows, "All Weeks", `weekly_comparison_${date}`);
   }
 
+  if (!config.connected) return <PlatformGate config={config} />;
+  if (platform === "amazon")   return <AmazonWeekly />;
+  if (platform === "flipkart") return <FlipkartWeekly />;
+
   if (loading) {
     return (
       <div className="max-w-[1200px] mx-auto">
-        <div className="bg-white rounded-xl border border-[#E4E6EB] p-12 text-center text-[#8A8D91] text-sm">
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-12 text-center text-[#8A8D91] dark:text-[#616161] text-sm">
           Loading weekly data...
         </div>
       </div>
@@ -367,8 +430,8 @@ export default function WeeklyReportPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-bold text-[#1C2B33]">Weekly Report</h2>
-          <p className="text-[13px] text-[#65676B] mt-0.5">
+          <h2 className="text-[20px] font-bold text-[#1C2B33] dark:text-[#ededed]">Weekly Report</h2>
+          <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-0.5">
             Performance Marketing &middot; Monday to Sunday
           </p>
         </div>
@@ -376,7 +439,7 @@ export default function WeeklyReportPage() {
           <select
             value={numWeeks}
             onChange={(e) => setNumWeeks(Number(e.target.value))}
-            className="appearance-none bg-white border border-[#CED0D4] rounded-lg px-3 py-2 text-[14px] text-[#1C2B33] font-medium cursor-pointer hover:border-[#1877F2] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2] transition-colors"
+            className="appearance-none bg-white dark:bg-[#111111] border border-[#CED0D4] dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium cursor-pointer hover:border-[#1877F2] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2] transition-colors"
           >
             <option value={5}>Last 5 weeks</option>
             <option value={8}>Last 8 weeks</option>
@@ -387,19 +450,19 @@ export default function WeeklyReportPage() {
 
       {/* This Week vs Last Week — Funnel Report */}
       {currentWeek && previousWeek && (
-        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-[15px] font-semibold text-[#1C2B33]">
+              <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">
                 This Week vs Previous Week
               </h3>
-              <p className="text-[12px] text-[#8A8D91] mt-0.5">
+              <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">
                 {currentWeek.startDate} – today vs {previousWeek.startDate} – {previousWeek.endDate}
               </p>
             </div>
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed] hover:bg-[#F0F2F5] dark:hover:bg-[#2a2a2a] transition-colors self-start sm:self-auto"
             >
               <Download className="h-3.5 w-3.5" />
               Export
@@ -408,11 +471,11 @@ export default function WeeklyReportPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
-                <tr className="border-b border-[#E4E6EB]">
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Parameter</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">This Week</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Prev Week</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">WoW</th>
+                <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Parameter</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">This Week</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Prev Week</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">WoW</th>
                 </tr>
               </thead>
               <tbody>
@@ -437,6 +500,7 @@ export default function WeeklyReportPage() {
                   <FunnelRow label="3-Second Video Views" thisWeek={currentWeek.video_3s_views} prevWeek={previousWeek.video_3s_views} format="number" />
                   <FunnelRow label="Thumb Stop Rate (%)" thisWeek={currentWeek.thumb_stop_rate} prevWeek={previousWeek.thumb_stop_rate} format="percent" />
                   <FunnelRow label="Video ThruPlay" thisWeek={currentWeek.video_thruplay} prevWeek={previousWeek.video_thruplay} format="number" />
+                  <FunnelRow label="Avg Watch Time (s)" thisWeek={currentWeek.video_avg_watch_time || null} prevWeek={previousWeek.video_avg_watch_time || null} format="seconds" />
                 </FunnelSection>
 
                 <FunnelSection title="Bottom of Funnel">
@@ -446,6 +510,49 @@ export default function WeeklyReportPage() {
                   <FunnelRow label="Cost per Checkout (₹)" thisWeek={currentWeek.cost_per_initiate_checkout} prevWeek={previousWeek.cost_per_initiate_checkout} format="currency" invert />
                   <FunnelRow label="Purchases" thisWeek={currentWeek.purchases} prevWeek={previousWeek.purchases} format="number" />
                 </FunnelSection>
+
+                {allFunnelSkus.length > 0 && (
+                  <FunnelSection title="Product / SKU Performance">
+                    {allFunnelSkus.map((sku) => {
+                      const cwSku = currentWeekSkus.find((s) => s.variant_id === sku.variant_id);
+                      const pwSku = prevWeekSkus.find((s) => s.variant_id === sku.variant_id);
+                      const label = sku.variant_title && sku.variant_title !== "Default Title"
+                        ? `Units Sold — ${sku.variant_title}`
+                        : `Units Sold — ${sku.product_title}`;
+                      return (
+                        <FunnelRow
+                          key={sku.variant_id}
+                          label={label}
+                          thisWeek={cwSku ? cwSku.units_sold : null}
+                          prevWeek={pwSku ? pwSku.units_sold : null}
+                          format="number"
+                        />
+                      );
+                    })}
+                    <FunnelRow
+                      label="AOV — Avg Order Value (₹)"
+                      thisWeek={currentWeekShopifyTotals && currentWeekShopifyTotals.orders_count > 0 ? currentWeekShopifyTotals.aov : null}
+                      prevWeek={prevWeekShopifyTotals && prevWeekShopifyTotals.orders_count > 0 ? prevWeekShopifyTotals.aov : null}
+                      format="currency"
+                    />
+                    {(() => {
+                      const bestSku = allFunnelSkus[0];
+                      const cwBest = currentWeekSkus.find((s) => s.variant_id === bestSku.variant_id);
+                      const pwBest = prevWeekSkus.find((s) => s.variant_id === bestSku.variant_id);
+                      const skuLabel = bestSku.variant_title && bestSku.variant_title !== "Default Title"
+                        ? bestSku.variant_title : bestSku.product_title;
+                      return (
+                        <FunnelRow
+                          label={`CPP — ${skuLabel} (Best Seller)`}
+                          thisWeek={cwBest && cwBest.orders_count > 0 && currentWeek ? currentWeek.spend / cwBest.orders_count : null}
+                          prevWeek={pwBest && pwBest.orders_count > 0 && previousWeek ? previousWeek.spend / pwBest.orders_count : null}
+                          format="currency"
+                          invert
+                        />
+                      );
+                    })()}
+                  </FunnelSection>
+                )}
               </tbody>
             </table>
           </div>
@@ -453,56 +560,56 @@ export default function WeeklyReportPage() {
       )}
 
       {/* Creative Performance */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a] flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Creative Performance</h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">Top ads by spend · {numWeeks === 1 ? "This week" : `Last ${numWeeks} weeks`}</p>
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Creative Performance</h3>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">Top ads by spend · {numWeeks === 1 ? "This week" : `Last ${numWeeks} weeks`}</p>
           </div>
         </div>
         {creatives.length === 0 ? (
-          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91] dark:text-[#616161]">
             No creative data yet — sync will populate this after the migration runs.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead>
-                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">#</th>
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Ad Name</th>
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Ad Set</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPP</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">TSR</th>
+                <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Ad Name</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Ad Set</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Spend</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Impressions</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CTR</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">ROAS</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Purchases</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CPP</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">TSR</th>
                 </tr>
               </thead>
               <tbody>
                 {creatives.map((c, i) => (
-                  <tr key={c.ad_id} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
-                    <td className="px-4 py-3 text-[13px] text-[#8A8D91]">{i + 1}</td>
+                  <tr key={c.ad_id} className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]">
+                    <td className="px-4 py-3 text-[13px] text-[#8A8D91] dark:text-[#616161]">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <span className="text-[13px] font-medium text-[#1C2B33] line-clamp-2 max-w-[200px] block">{c.ad_name}</span>
+                      <span className="text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed] line-clamp-2 max-w-[200px] block">{c.ad_name}</span>
                     </td>
-                    <td className="px-4 py-3 text-[13px] text-[#65676B] max-w-[150px]">
+                    <td className="px-4 py-3 text-[13px] text-[#65676B] dark:text-[#888888] max-w-[150px]">
                       <span className="line-clamp-1 block">{c.adset_name || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtCurrency(c.spend)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtNum(c.impressions)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtCurrency(c.spend)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtNum(c.impressions)}</td>
                     <td className="px-4 py-3 text-right text-[13px] tabular-nums">
-                      <span className={c.ctr >= 1.5 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{c.ctr.toFixed(2)}%</span>
+                      <span className={c.ctr >= 1.5 ? "text-[#31A24C] font-medium" : "text-[#1C2B33] dark:text-[#ededed]"}>{c.ctr.toFixed(2)}%</span>
                     </td>
                     <td className="px-4 py-3 text-right text-[13px] tabular-nums">
-                      <span className={c.roas >= 2 ? "text-[#31A24C] font-medium" : c.roas > 0 && c.roas < 1 ? "text-[#E41E3F]" : "text-[#1C2B33]"}>{c.roas.toFixed(2)}x</span>
+                      <span className={c.roas >= 2 ? "text-[#31A24C] font-medium" : c.roas > 0 && c.roas < 1 ? "text-[#E41E3F]" : "text-[#1C2B33] dark:text-[#ededed]"}>{c.roas.toFixed(2)}x</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(c.purchases)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{c.purchases > 0 ? fmtCurrency(c.cost_per_purchase) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtNum(c.purchases)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{c.purchases > 0 ? fmtCurrency(c.cost_per_purchase) : "—"}</td>
                     <td className="px-4 py-3 text-right text-[13px] tabular-nums">
-                      <span className={c.thumb_stop_rate >= 25 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{c.thumb_stop_rate.toFixed(1)}%</span>
+                      <span className={c.thumb_stop_rate >= 25 ? "text-[#31A24C] font-medium" : "text-[#1C2B33] dark:text-[#ededed]"}>{c.thumb_stop_rate.toFixed(1)}%</span>
                     </td>
                   </tr>
                 ))}
@@ -515,45 +622,45 @@ export default function WeeklyReportPage() {
       {/* Audience Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Age & Gender */}
-        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#E4E6EB]">
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Age & Gender</h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">Spend share by audience segment</p>
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Age & Gender</h3>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">Spend share by audience segment</p>
           </div>
           {ageGender.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91] dark:text-[#616161]">
               No audience data yet — will populate after sync.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[360px]">
                 <thead>
-                  <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Segment</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Share</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
+                  <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Segment</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Spend</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Share</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CTR</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Purchases</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ageGender.slice(0, 10).map((row) => {
                     const [age, gender] = row.breakdown_value.split("|");
                     return (
-                      <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
+                      <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]">
                         <td className="px-4 py-3">
-                          <div className="text-[13px] font-medium text-[#1C2B33]">{age}</div>
-                          <div className="text-[12px] text-[#65676B] capitalize">{gender}</div>
+                          <div className="text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed]">{age}</div>
+                          <div className="text-[12px] text-[#65676B] dark:text-[#888888] capitalize">{gender}</div>
                         </td>
-                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(row.spend)}</td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtCurrency(row.spend)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, row.spend_share)}px`, maxWidth: "60px" }} />
-                            <span className="text-[12px] text-[#65676B] tabular-nums">{row.spend_share.toFixed(1)}%</span>
+                            <span className="text-[12px] text-[#65676B] dark:text-[#888888] tabular-nums">{row.spend_share.toFixed(1)}%</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{row.ctr.toFixed(2)}%</td>
-                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{row.ctr.toFixed(2)}%</td>
+                        <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
                       </tr>
                     );
                   })}
@@ -564,41 +671,41 @@ export default function WeeklyReportPage() {
         </div>
 
         {/* Top Regions */}
-        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#E4E6EB]">
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Top Regions</h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">Spend and conversions by state/city</p>
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Top Regions</h3>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">Spend and conversions by state/city</p>
           </div>
           {regions.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
+            <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91] dark:text-[#616161]">
               No region data yet — will populate after sync.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[340px]">
                 <thead>
-                  <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Region</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Share</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
-                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+                  <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                    <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Region</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Spend</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Share</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Purchases</th>
+                    <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">ROAS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {regions.slice(0, 10).map((row) => (
-                    <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
-                      <td className="px-4 py-3 text-[13px] font-medium text-[#1C2B33]">{row.breakdown_value}</td>
-                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(row.spend)}</td>
+                    <tr key={row.breakdown_value} className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]">
+                      <td className="px-4 py-3 text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed]">{row.breakdown_value}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtCurrency(row.spend)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, row.spend_share)}px`, maxWidth: "60px" }} />
-                          <span className="text-[12px] text-[#65676B] tabular-nums">{row.spend_share.toFixed(1)}%</span>
+                          <span className="text-[12px] text-[#65676B] dark:text-[#888888] tabular-nums">{row.spend_share.toFixed(1)}%</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtNum(row.purchases)}</td>
                       <td className="px-4 py-3 text-right text-[13px] tabular-nums">
-                        <span className={row.roas >= 2 ? "text-[#31A24C] font-medium" : "text-[#1C2B33]"}>{row.roas > 0 ? `${row.roas.toFixed(2)}x` : "—"}</span>
+                        <span className={row.roas >= 2 ? "text-[#31A24C] font-medium" : "text-[#1C2B33] dark:text-[#ededed]"}>{row.roas > 0 ? `${row.roas.toFixed(2)}x` : "—"}</span>
                       </td>
                     </tr>
                   ))}
@@ -610,62 +717,68 @@ export default function WeeklyReportPage() {
       </div>
 
       {/* Product Performance (Shopify) */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a] flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Product Performance</h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Product Performance</h3>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">
               Units sold by SKU from Shopify
               {shopifyTotals && shopifyTotals.orders_count > 0 && (
-                <span className="ml-2 text-[#1C2B33]">
+                <span className="ml-2 text-[#1C2B33] dark:text-[#ededed]">
                   · {shopifyTotals.orders_count} orders · AOV {fmtCurrency(shopifyTotals.aov)}
                 </span>
               )}
             </p>
           </div>
         </div>
-        {skus.length === 0 ? (
-          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91]">
-            No Shopify data yet — add credentials in <code className="bg-[#F0F2F5] px-1.5 py-0.5 rounded text-[12px]">scripts/.env</code> and trigger a sync.
+        {allKnownSkus.length === 0 ? (
+          <div className="px-5 py-10 text-center text-[13px] text-[#8A8D91] dark:text-[#616161]">
+            No Shopify data yet — add credentials in <code className="bg-[#F0F2F5] dark:bg-[#1a1a1a] px-1.5 py-0.5 rounded text-[12px] text-[#1C2B33] dark:text-[#ededed]">scripts/.env</code> and trigger a sync.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>
-                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">#</th>
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Product</th>
-                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">SKU</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Units Sold</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Orders</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Revenue</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">AOV</th>
-                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Rev Share</th>
+                <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Product</th>
+                  <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">SKU</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Units Sold</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Orders</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Revenue</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">AOV</th>
+                  <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Rev Share</th>
                 </tr>
               </thead>
               <tbody>
-                {skus.map((s, i) => (
-                  <tr key={s.variant_id} className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]">
-                    <td className="px-4 py-3 text-[13px] text-[#8A8D91]">{i + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-[13px] font-medium text-[#1C2B33] line-clamp-1 max-w-[200px]">{s.product_title}</div>
-                      {s.variant_title && s.variant_title !== "Default Title" && (
-                        <div className="text-[12px] text-[#65676B]">{s.variant_title}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-[#65676B] font-mono">{s.sku || "—"}</td>
-                    <td className="px-4 py-3 text-right text-[14px] font-bold text-[#1C2B33] tabular-nums">{fmtNum(s.units_sold)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtNum(s.orders_count)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(s.revenue)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] tabular-nums">{fmtCurrency(s.aov)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, s.revenue_share)}px`, maxWidth: "60px" }} />
-                        <span className="text-[12px] text-[#65676B] tabular-nums">{s.revenue_share.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {allKnownSkus.map((knownSku, i) => {
+                  const s = skus.find((x) => x.variant_id === knownSku.variant_id);
+                  const dash = <span className="text-[#8A8D91] dark:text-[#616161]">—</span>;
+                  return (
+                    <tr key={knownSku.variant_id} className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]">
+                      <td className="px-4 py-3 text-[13px] text-[#8A8D91] dark:text-[#616161]">{i + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed]">{knownSku.product_title}</div>
+                        {knownSku.variant_title && knownSku.variant_title !== "Default Title" && (
+                          <div className="text-[12px] text-[#65676B] dark:text-[#888888]">{knownSku.variant_title}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-[13px] text-[#65676B] dark:text-[#888888] font-mono">{knownSku.sku || "—"}</td>
+                      <td className="px-4 py-3 text-right text-[14px] font-bold text-[#1C2B33] dark:text-[#ededed] tabular-nums">{s ? fmtNum(s.units_sold) : dash}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{s ? fmtNum(s.orders_count) : dash}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{s ? fmtCurrency(s.revenue) : dash}</td>
+                      <td className="px-4 py-3 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{s ? fmtCurrency(s.aov) : dash}</td>
+                      <td className="px-4 py-3 text-right">
+                        {s ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div className="h-1.5 rounded-full bg-[#1877F2]" style={{ width: `${Math.max(4, s.revenue_share)}px`, maxWidth: "60px" }} />
+                            <span className="text-[12px] text-[#65676B] dark:text-[#888888] tabular-nums">{s.revenue_share.toFixed(1)}%</span>
+                          </div>
+                        ) : dash}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -673,11 +786,11 @@ export default function WeeklyReportPage() {
       </div>
 
       {/* Planned vs Actual Spend */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a] flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">Planned vs Actual Spend</h3>
-            <p className="text-[12px] text-[#8A8D91] mt-0.5">Set planned spend per week in Settings</p>
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Planned vs Actual Spend</h3>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-0.5">Set planned spend per week in Settings</p>
           </div>
           <a
             href="/settings"
@@ -689,12 +802,12 @@ export default function WeeklyReportPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[540px]">
             <thead>
-              <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Week</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Planned</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Actual</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Variance</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Utilisation</th>
+              <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Week</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Planned</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Actual</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Variance</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Utilisation</th>
               </tr>
             </thead>
             <tbody>
@@ -707,23 +820,23 @@ export default function WeeklyReportPage() {
                 return (
                   <tr
                     key={w.label}
-                    className={`border-b border-[#E4E6EB] last:border-0 ${w.isCurrent ? "bg-[#EBF5FF]/40" : "hover:bg-[#F8F9FA]"}`}
+                    className={`border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 ${w.isCurrent ? "bg-[#EBF5FF]/40 dark:bg-[#0c1a2e]/20" : "hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]"}`}
                   >
                     <td className="px-4 py-3.5">
-                      <span className={`text-[13px] font-medium ${w.isCurrent ? "text-[#1877F2]" : "text-[#1C2B33]"}`}>{w.label}</span>
-                      <div className="text-[12px] text-[#65676B]">{w.startDate} – {w.endDate}</div>
+                      <span className={`text-[13px] font-medium ${w.isCurrent ? "text-[#1877F2]" : "text-[#1C2B33] dark:text-[#ededed]"}`}>{w.label}</span>
+                      <div className="text-[12px] text-[#65676B] dark:text-[#888888]">{w.startDate} – {w.endDate}</div>
                     </td>
-                    <td className="px-4 py-3.5 text-right text-[13px] text-[#1C2B33] tabular-nums">
-                      {planned > 0 ? fmtCurrency(planned) : <span className="text-[#8A8D91]">Not set</span>}
+                    <td className="px-4 py-3.5 text-right text-[13px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
+                      {planned > 0 ? fmtCurrency(planned) : <span className="text-[#8A8D91] dark:text-[#616161]">Not set</span>}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-[13px] font-medium text-[#1C2B33] tabular-nums">{fmtCurrency(actual)}</td>
+                    <td className="px-4 py-3.5 text-right text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtCurrency(actual)}</td>
                     <td className="px-4 py-3.5 text-right text-[13px] tabular-nums">
                       {planned > 0 ? (
                         <span className={isOver ? "text-[#E41E3F]" : "text-[#31A24C]"}>
                           {isOver ? "+" : ""}{fmtCurrency(variance)}
                         </span>
                       ) : (
-                        <span className="text-[#8A8D91]">—</span>
+                        <span className="text-[#8A8D91] dark:text-[#616161]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right text-[13px] tabular-nums">
@@ -732,7 +845,7 @@ export default function WeeklyReportPage() {
                           {utilisation.toFixed(1)}%
                         </span>
                       ) : (
-                        <span className="text-[#8A8D91]">—</span>
+                        <span className="text-[#8A8D91] dark:text-[#616161]">—</span>
                       )}
                     </td>
                   </tr>
@@ -744,15 +857,15 @@ export default function WeeklyReportPage() {
       </div>
 
       {/* Week-by-Week Comparison Table */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-[#1C2B33]">
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a] flex items-center justify-between">
+          <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">
             Week-by-Week Comparison
           </h3>
           <button
             onClick={handleExportWeekly}
             disabled={weeks.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed] hover:bg-[#F0F2F5] dark:hover:bg-[#2a2a2a] transition-colors disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" />
             Export
@@ -761,17 +874,17 @@ export default function WeeklyReportPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead>
-              <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Week</th>
-                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Period</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Revenue</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Reach</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Clicks</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Purchases</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CPP</th>
+              <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Week</th>
+                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Period</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Spend</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Revenue</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">ROAS</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Reach</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Clicks</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CTR</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Purchases</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CPP</th>
               </tr>
             </thead>
             <tbody>
@@ -780,46 +893,46 @@ export default function WeeklyReportPage() {
                 return (
                   <tr
                     key={w.label}
-                    className={`border-b border-[#E4E6EB] last:border-0 ${w.isCurrent ? "bg-[#EBF5FF]/40" : "hover:bg-[#F8F9FA]"}`}
+                    className={`border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 ${w.isCurrent ? "bg-[#EBF5FF]/40 dark:bg-[#0c1a2e]/20" : "hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]"}`}
                   >
                     <td className="px-4 py-3.5">
-                      <span className={`text-[14px] font-medium ${w.isCurrent ? "text-[#1877F2]" : "text-[#1C2B33]"}`}>
+                      <span className={`text-[14px] font-medium ${w.isCurrent ? "text-[#1877F2]" : "text-[#1C2B33] dark:text-[#ededed]"}`}>
                         {w.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-[13px] text-[#65676B] whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-[13px] text-[#65676B] dark:text-[#888888] whitespace-nowrap">
                       {w.startDate} – {w.endDate}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{fmtCurrency(w.spend)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtCurrency(w.spend)}</div>
                       {prev && <WowBadge current={w.spend} previous={prev.spend} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtCurrency(w.purchase_value)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtCurrency(w.purchase_value)}</div>
                       {prev && <WowBadge current={w.purchase_value} previous={prev.purchase_value} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{w.roas.toFixed(2)}x</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{w.roas.toFixed(2)}x</div>
                       {prev && <WowBadge current={w.roas} previous={prev.roas} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtNum(w.reach)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtNum(w.reach)}</div>
                       {prev && <WowBadge current={w.reach} previous={prev.reach} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtNum(w.clicks)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtNum(w.clicks)}</div>
                       {prev && <WowBadge current={w.clicks} previous={prev.clicks} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{w.ctr.toFixed(2)}%</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{w.ctr.toFixed(2)}%</div>
                       {prev && <WowBadge current={w.ctr} previous={prev.ctr} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] font-medium tabular-nums">{fmtNum(w.purchases)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">{fmtNum(w.purchases)}</div>
                       {prev && <WowBadge current={w.purchases} previous={prev.purchases} />}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <div className="text-[14px] text-[#1C2B33] tabular-nums">{fmtCurrency(w.cost_per_purchase)}</div>
+                      <div className="text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">{fmtCurrency(w.cost_per_purchase)}</div>
                       {prev && <WowBadge current={w.cost_per_purchase} previous={prev.cost_per_purchase} invert />}
                     </td>
                   </tr>

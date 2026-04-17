@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
     landing_page_views: number;
     video_thruplay: number;
     video_3s_views: number;
+    video_watch_time_sum: number; // weighted sum: avg_watch_time × 3s_views
   }
 
   const dailyMap = new Map<string, DailyAgg>();
@@ -83,27 +84,32 @@ export async function GET(request: NextRequest) {
       spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0,
       reach: 0, purchases: 0, purchase_value: 0,
       add_to_cart: 0, initiate_checkout: 0, landing_page_views: 0,
-      video_thruplay: 0, video_3s_views: 0,
+      video_thruplay: 0, video_3s_views: 0, video_watch_time_sum: 0,
     };
     existing.spend += Number(m.spend);
     existing.impressions += Number(m.impressions);
     existing.clicks += Number(m.clicks);
     existing.conversions += Number(m.conversions);
     existing.revenue += Number(m.roas) * Number(m.spend);
-    existing.reach += Number(m.reach || 0);   
+    existing.reach += Number(m.reach || 0);
     existing.purchases += Number(m.purchases || 0);
     existing.purchase_value += Number(m.purchase_value || 0);
     existing.add_to_cart += Number(m.add_to_cart || 0);
     existing.initiate_checkout += Number(m.initiate_checkout || 0);
     existing.landing_page_views += Number(m.landing_page_views || 0);
     existing.video_thruplay += Number(m.video_thruplay || 0);
-    existing.video_3s_views += Number(m.video_3s_views || 0);
+    const views = Number(m.video_3s_views || 0);
+    existing.video_3s_views += views;
+    existing.video_watch_time_sum += Number(m.video_avg_watch_time || 0) * views;
     dailyMap.set(m.date, existing);
   }
 
-  const daily = Array.from(dailyMap.values()).sort(
-    (a, b) => a.date.localeCompare(b.date)
-  );
+  const daily = Array.from(dailyMap.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ video_watch_time_sum, ...d }) => ({
+      ...d,
+      video_avg_watch_time: d.video_3s_views > 0 ? Math.round((video_watch_time_sum / d.video_3s_views) * 100) / 100 : 0,
+    }));
 
   // Calculate totals
   const totalSpend = metrics.reduce((s, m) => s + Number(m.spend), 0);
@@ -126,6 +132,8 @@ export async function GET(request: NextRequest) {
   const totalLandingPageViews = metrics.reduce((s, m) => s + Number(m.landing_page_views || 0), 0);
   const totalVideoThruplay = metrics.reduce((s, m) => s + Number(m.video_thruplay || 0), 0);
   const totalVideo3sViews = metrics.reduce((s, m) => s + Number(m.video_3s_views || 0), 0);
+  const totalWatchTimeWeighted = metrics.reduce((s, m) => s + Number(m.video_avg_watch_time || 0) * Number(m.video_3s_views || 0), 0);
+  const avgWatchTime = totalVideo3sViews > 0 ? Math.round((totalWatchTimeWeighted / totalVideo3sViews) * 100) / 100 : 0;
 
   return NextResponse.json({
     daily,
@@ -151,6 +159,7 @@ export async function GET(request: NextRequest) {
       video_thruplay: totalVideoThruplay,
       video_3s_views: totalVideo3sViews,
       thumb_stop_rate: totalImpressions > 0 ? (totalVideo3sViews / totalImpressions) * 100 : 0,
+      video_avg_watch_time: avgWatchTime,
     },
   });
 }

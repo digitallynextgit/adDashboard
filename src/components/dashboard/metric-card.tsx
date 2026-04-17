@@ -11,9 +11,9 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, change, prefix }: MetricCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-[#E4E6EB] p-3 sm:p-5 hover:shadow-sm transition-shadow">
-      <p className="text-[12px] sm:text-[13px] font-medium text-[#65676B] mb-1">{title}</p>
-      <p className="text-[22px] sm:text-[28px] font-bold text-[#1C2B33] tracking-tight leading-tight">
+    <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-3 sm:p-5 hover:shadow-sm transition-shadow">
+      <p className="text-[12px] sm:text-[13px] font-medium text-[#65676B] dark:text-[#888888] mb-1">{title}</p>
+      <p className="text-[22px] sm:text-[28px] font-bold text-[#1C2B33] dark:text-[#ededed] tracking-tight leading-tight">
         {prefix}
         {value}
       </p>
@@ -34,12 +34,12 @@ export function MetricCard({ title, value, change, prefix }: MetricCardProps) {
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-[#65676B]">
+            <div className="flex items-center gap-1 text-[#65676B] dark:text-[#888888]">
               <Minus className="h-3.5 w-3.5" />
               <span className="text-[13px] font-medium">0%</span>
             </div>
           )}
-          <span className="text-[12px] text-[#8A8D91]">vs prev period</span>
+          <span className="text-[12px] text-[#8A8D91] dark:text-[#616161]">vs prev period</span>
         </div>
       )}
     </div>

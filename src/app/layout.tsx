@@ -27,8 +27,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex bg-[#F0F2F5] font-sans">
+      <body className="min-h-full flex bg-[#F0F2F5] dark:bg-[#0a0a0a] font-sans">
         <Shell>{children}</Shell>
       </body>
     </html>

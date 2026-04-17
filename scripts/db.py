@@ -61,6 +61,23 @@ def bulk_upsert_shopify_sales(rows: list[dict]):
         supabase.table("shopify_daily_sales").upsert(rows, on_conflict="date,variant_id").execute()
 
 
+def bulk_upsert_shopify_variants(rows: list[dict]):
+    """Bulk upsert Shopify product variants (full catalog). Single DB call."""
+    if rows:
+        supabase.table("shopify_variants").upsert(rows, on_conflict="variant_id").execute()
+
+
+def upsert_flipkart_campaign(row: dict):
+    """Upsert a single Flipkart campaign."""
+    supabase.table("flipkart_campaigns").upsert(row, on_conflict="campaign_id").execute()
+
+
+def bulk_upsert_flipkart_metrics(rows: list[dict]):
+    """Bulk upsert Flipkart daily metrics. Single DB call for all rows."""
+    if rows:
+        supabase.table("flipkart_metrics").upsert(rows, on_conflict="campaign_id,date").execute()
+
+
 def log_sync(platform: str, status: str, records: int, error: str | None, started_at: str, finished_at: str):
     """Log a sync run."""
     supabase.table("sync_log").insert({

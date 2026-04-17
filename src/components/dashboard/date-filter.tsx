@@ -102,7 +102,6 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
   const [viewYear,  setViewYear]  = useState(initDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(initDate.getMonth());
 
-  // selection state: first click = selStart, second click = apply + close
   const [selStart, setSelStart] = useState<string | null>(start);
   const [selEnd,   setSelEnd]   = useState<string | null>(end);
   const [hover,    setHover]    = useState<string | null>(null);
@@ -120,11 +119,9 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
 
   function handleClick(day: string) {
     if (!selStart || selEnd) {
-      // Start a new selection
       setSelStart(day);
       setSelEnd(null);
     } else {
-      // Complete the range and apply immediately
       const lo = day < selStart ? day : selStart;
       const hi = day < selStart ? selStart : day;
       setSelStart(lo);
@@ -133,12 +130,10 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
     }
   }
 
-  // Effective range for highlight (use hover preview when only start is chosen)
   const effEnd = selEnd ?? hover;
   const rangeA = selStart && effEnd ? (selStart <= effEnd ? selStart : effEnd) : selStart;
   const rangeB = selStart && effEnd ? (selStart <= effEnd ? effEnd : selStart) : selStart;
 
-  // Build day grid
   const firstDow    = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (string | null)[] = Array(firstDow).fill(null);
@@ -149,32 +144,32 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
 
   return (
     <div
-      className="absolute right-0 top-[calc(100%+8px)] z-50 bg-white rounded-xl border border-[#E4E6EB] shadow-lg p-4 w-[288px]"
+      className="absolute right-0 top-[calc(100%+8px)] z-50 bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] shadow-lg p-4 w-[288px] max-w-[calc(100vw-2rem)]"
       onMouseLeave={() => setHover(null)}
     >
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={prevMonth}
-          className="p-1.5 rounded-lg hover:bg-[#F0F2F5] transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c] transition-colors"
         >
-          <ChevronLeft className="h-4 w-4 text-[#65676B]" />
+          <ChevronLeft className="h-4 w-4 text-[#65676B] dark:text-[#888888]" />
         </button>
-        <span className="text-[14px] font-semibold text-[#1C2B33]">
+        <span className="text-[14px] font-semibold text-[#1C2B33] dark:text-[#ededed]">
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <button
           onClick={nextMonth}
-          className="p-1.5 rounded-lg hover:bg-[#F0F2F5] transition-colors"
+          className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c] transition-colors"
         >
-          <ChevronRight className="h-4 w-4 text-[#65676B]" />
+          <ChevronRight className="h-4 w-4 text-[#65676B] dark:text-[#888888]" />
         </button>
       </div>
 
       {/* Day-of-week labels */}
       <div className="grid grid-cols-7 mb-1">
         {DAY_LABELS.map(d => (
-          <div key={d} className="text-center text-[11px] font-medium text-[#8A8D91] py-1">
+          <div key={d} className="text-center text-[11px] font-medium text-[#8A8D91] dark:text-[#616161] py-1">
             {d}
           </div>
         ))}
@@ -198,9 +193,9 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
               key={day}
               className={[
                 "relative flex items-center justify-center h-8",
-                inRange              ? "bg-[#E7F3FF]"                   : "",
-                isRangeA && !isSingle ? "rounded-l-full bg-[#E7F3FF]"  : "",
-                isRangeB             ? "rounded-r-full bg-[#E7F3FF]"   : "",
+                inRange              ? "bg-[#E7F3FF] dark:bg-[#0c1a2e]"                   : "",
+                isRangeA && !isSingle ? "rounded-l-full bg-[#E7F3FF] dark:bg-[#0c1a2e]"  : "",
+                isRangeB             ? "rounded-r-full bg-[#E7F3FF] dark:bg-[#0c1a2e]"   : "",
               ].join(" ")}
             >
               <button
@@ -212,10 +207,10 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
                   isSelected
                     ? "bg-[#1877F2] text-white font-semibold"
                     : inRange
-                      ? "text-[#1C2B33] hover:bg-[#CBE0FF]"
+                      ? "text-[#1C2B33] dark:text-[#ededed] hover:bg-[#CBE0FF] dark:hover:bg-[#0f2040]"
                       : isFuture
-                        ? "text-[#CED0D4] cursor-not-allowed"
-                        : "text-[#1C2B33] hover:bg-[#F0F2F5]",
+                        ? "text-[#CED0D4] dark:text-[#444444] cursor-not-allowed"
+                        : "text-[#1C2B33] dark:text-[#ededed] hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c]",
                   isToday && !isSelected
                     ? "font-bold !text-[#1877F2]"
                     : "",
@@ -229,7 +224,7 @@ function CalendarPicker({ start, end, onApply }: CalendarPickerProps) {
       </div>
 
       {/* Footer hint */}
-      <div className="mt-3 pt-3 border-t border-[#E4E6EB] text-[12px] text-[#65676B] text-center min-h-[20px]">
+      <div className="mt-3 pt-3 border-t border-[#E4E6EB] dark:border-[#2a2a2a] text-[12px] text-[#65676B] dark:text-[#888888] text-center min-h-[20px]">
         {selStart && selEnd
           ? `${fmtShort(selStart)} – ${fmtShort(selEnd)}`
           : selStart
@@ -253,7 +248,6 @@ export function DateFilter({ start, end, onChange }: DateFilterProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const preset  = matchPreset(start, end);
 
-  // Close when clicking outside
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
@@ -275,7 +269,7 @@ export function DateFilter({ start, end, onChange }: DateFilterProps) {
             onChange(r.start, r.end);
             setOpen(false);
           }}
-          className="appearance-none bg-white border border-[#CED0D4] rounded-lg pl-3 pr-8 py-2 text-[14px] text-[#1C2B33] font-medium cursor-pointer hover:border-[#1877F2] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2] transition-colors"
+          className="appearance-none bg-white dark:bg-[#111111] border border-[#CED0D4] dark:border-[#2a2a2a] rounded-lg pl-3 pr-8 py-2 text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium cursor-pointer hover:border-[#1877F2] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2] transition-colors"
         >
           {PRESETS.map(p => (
             <option key={p.value} value={p.value}>{p.label}</option>
@@ -287,7 +281,7 @@ export function DateFilter({ start, end, onChange }: DateFilterProps) {
           )}
         </select>
         <svg
-          className="absolute right-2.5 h-4 w-4 text-[#65676B] pointer-events-none"
+          className="absolute right-2.5 h-4 w-4 text-[#65676B] dark:text-[#888888] pointer-events-none"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -302,8 +296,8 @@ export function DateFilter({ start, end, onChange }: DateFilterProps) {
         title="Pick custom date range"
         className={`p-2 rounded-lg border transition-colors ${
           open || !preset
-            ? "border-[#1877F2] bg-[#E7F3FF] text-[#1877F2]"
-            : "border-[#CED0D4] bg-white text-[#65676B] hover:bg-[#F0F2F5]"
+            ? "border-[#1877F2] bg-[#E7F3FF] dark:bg-[#0c1a2e] text-[#1877F2]"
+            : "border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#111111] text-[#65676B] dark:text-[#888888] hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c]"
         }`}
       >
         <Calendar className="h-4 w-4" />

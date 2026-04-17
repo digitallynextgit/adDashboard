@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Circle, Download } from "lucide-react";
+import { ArrowLeft, Circle, Download, FileQuestion } from "lucide-react";
 import { downloadExcel } from "@/lib/export";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { DateFilter, getDateRange, getPreviousPeriod } from "@/components/dashboard/date-filter";
@@ -44,7 +44,8 @@ export default function CampaignDetailPage() {
   const [daily, setDaily] = useState<DailyDetail[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [prevTotals, setPrevTotals] = useState<Totals | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -58,7 +59,13 @@ export default function CampaignDetailPage() {
     const currentData = await currentRes.json();
     const prevData = await prevRes.json();
 
-    setCampaign(currentData.campaign || null);
+    const campaign = currentData.campaign || null;
+    if (!campaign && !currentData.daily?.length) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    setCampaign(campaign);
     setDaily(currentData.daily || []);
     const t = currentData.totals;
     setTotals(t && t.spend !== undefined ? t : null);
@@ -83,6 +90,25 @@ export default function CampaignDetailPage() {
     return value.toFixed(0);
   }
 
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <FileQuestion className="h-12 w-12 text-[#CED0D4] dark:text-[#2a2a2a] mb-4" />
+        <h2 className="text-[18px] font-bold text-[#1C2B33] dark:text-[#ededed]">Campaign not found</h2>
+        <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-1.5 max-w-[280px]">
+          No campaign with this ID exists in the selected date range.
+        </p>
+        <a
+          href="/campaigns"
+          className="mt-5 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1877F2] text-white text-[13px] font-medium hover:bg-[#166FE5] transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to Campaigns
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1200px] mx-auto space-y-5">
       {/* Back + Header */}
@@ -90,23 +116,23 @@ export default function CampaignDetailPage() {
         <div className="flex items-center gap-4">
           <a
             href="/campaigns"
-            className="p-2 rounded-lg border border-[#CED0D4] bg-white hover:bg-[#F0F2F5] transition-colors"
+            className="p-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#111111] hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c] transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-[#65676B]" />
+            <ArrowLeft className="h-4 w-4 text-[#65676B] dark:text-[#888888]" />
           </a>
           <div>
             {campaign ? (
               <>
                 <div className="flex items-center gap-2.5">
-                  <h2 className="text-[20px] font-bold text-[#1C2B33]">
+                  <h2 className="text-[20px] font-bold text-[#1C2B33] dark:text-[#ededed]">
                     {campaign.campaign_name}
                   </h2>
                   <StatusDot status={campaign.status} />
-                  <span className="text-[13px] text-[#65676B] capitalize">
+                  <span className="text-[13px] text-[#65676B] dark:text-[#888888] capitalize">
                     {campaign.status}
                   </span>
                 </div>
-                <p className="text-[13px] text-[#65676B] mt-0.5 capitalize">
+                <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-0.5 capitalize">
                   {campaign.platform} Ads &middot; ID: {campaign.campaign_id}
                 </p>
               </>
@@ -115,7 +141,7 @@ export default function CampaignDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <button
             onClick={() => {
               if (!daily.length) return;
@@ -136,7 +162,7 @@ export default function CampaignDetailPage() {
               downloadExcel(rows, "Daily Breakdown", `${name}_${start}_${end}_${date}`);
             }}
             disabled={loading || daily.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] bg-white text-[13px] font-medium text-[#1C2B33] hover:bg-[#F0F2F5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#111111] text-[13px] font-medium text-[#1C2B33] dark:text-[#ededed] hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-3.5 w-3.5" />
             Export
@@ -198,58 +224,58 @@ export default function CampaignDetailPage() {
 
       {/* Daily breakdown table */}
       {daily.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#E4E6EB]">
-            <h3 className="text-[15px] font-semibold text-[#1C2B33]">
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+            <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">
               Daily Breakdown
             </h3>
           </div>
           <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead>
-              <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Date</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Spend</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Impressions</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Clicks</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">CTR</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Cost / Result</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Results</th>
-                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">ROAS</th>
+              <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                <th className="text-left px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Date</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Spend</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Impressions</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Clicks</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">CTR</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Cost / Result</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Results</th>
+                <th className="text-right px-4 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">ROAS</th>
               </tr>
             </thead>
             <tbody>
               {daily.map((d) => (
                 <tr
                   key={d.date}
-                  className="border-b border-[#E4E6EB] last:border-0 hover:bg-[#F8F9FA]"
+                  className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]"
                 >
-                  <td className="px-4 py-3 text-[14px] text-[#1C2B33]">
+                  <td className="px-4 py-3 text-[14px] text-[#1C2B33] dark:text-[#ededed]">
                     {new Date(d.date).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
                     })}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     ₹{d.spend.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     {d.impressions.toLocaleString("en-IN")}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     {d.clicks.toLocaleString("en-IN")}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     {d.ctr.toFixed(2)}%
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     ₹{d.cost_per_result.toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] font-medium tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] font-medium tabular-nums">
                     {d.conversions}
                   </td>
-                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-[#1C2B33] dark:text-[#ededed] tabular-nums">
                     {d.roas.toFixed(2)}x
                   </td>
                 </tr>

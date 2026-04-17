@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, XCircle, Clock, Circle, Save } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Circle, Save, Construction } from "lucide-react";
 import type { SyncLog } from "@/lib/types";
 
 function formatTime(iso: string): string {
@@ -22,10 +22,10 @@ function StatusIcon({ status }: { status: string }) {
 function StatusLabel({ status }: { status: string }) {
   const color =
     status === "success"
-      ? "text-[#31A24C] bg-[#E7F6EC]"
+      ? "text-[#31A24C] bg-[#E7F6EC] dark:bg-[#064E3B]/40"
       : status === "failed"
-        ? "text-[#E41E3F] bg-[#FEE7EB]"
-        : "text-[#F7B928] bg-[#FFF8E1]";
+        ? "text-[#E41E3F] bg-[#FEE7EB] dark:bg-[#7F1D1D]/40"
+        : "text-[#F7B928] bg-[#FFF8E1] dark:bg-[#78350F]/40";
 
   return (
     <span
@@ -61,7 +61,6 @@ function generateWeeks(): string[] {
   const today = new Date();
   const currentMonday = getMonday(today);
   const weeks: string[] = [];
-  // 8 past weeks + current week + 3 future weeks = 12 total
   for (let i = -8; i <= 3; i++) {
     const d = new Date(currentMonday);
     d.setDate(d.getDate() + i * 7);
@@ -70,14 +69,12 @@ function generateWeeks(): string[] {
   return weeks;
 }
 
-// Default hardcoded planned spend — user can override in the table below
 const DEFAULT_PLANNED_SPEND = 50000;
 
 export default function SettingsPage() {
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Planned spend state: map of week_start → { value, saving, saved, error }
   const [spendMap, setSpendMap] = useState<
     Record<string, { value: string; saving: boolean; saved: boolean; error: string }>
   >({});
@@ -94,7 +91,6 @@ export default function SettingsPage() {
       });
   }, []);
 
-  // Load planned spend for all weeks
   const loadPlannedSpend = useCallback(async () => {
     setSpendLoading(true);
     const start = weeks[0];
@@ -168,8 +164,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-[900px] mx-auto space-y-5">
       <div>
-        <h2 className="text-[20px] font-bold text-[#1C2B33]">Settings</h2>
-        <p className="text-[13px] text-[#65676B] mt-0.5">
+        <h2 className="text-[20px] font-bold text-[#1C2B33] dark:text-[#ededed]">Settings</h2>
+        <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-0.5">
           Sync status and campaign configuration
         </p>
       </div>
@@ -177,93 +173,148 @@ export default function SettingsPage() {
       {/* Platform status cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Meta */}
-        <div className="bg-white rounded-xl border border-[#E4E6EB] p-5">
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-[#1877F2] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[#1877F2] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-[14px]">M</span>
             </div>
             <div>
-              <h3 className="text-[15px] font-semibold text-[#1C2B33]">Meta Ads</h3>
-              <p className="text-[12px] text-[#8A8D91]">Facebook & Instagram</p>
+              <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Meta Ads</h3>
+              <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Facebook & Instagram</p>
             </div>
+            <span className="ml-auto text-[11px] font-medium text-[#31A24C] bg-[#E7F6EC] dark:bg-[#064E3B]/40 px-2.5 py-0.5 rounded-full">Connected</span>
           </div>
           {latestMeta ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Status</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Status</span>
                 <StatusLabel status={latestMeta.status} />
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Last sync</span>
-                <span className="text-[13px] text-[#1C2B33]">{formatTime(latestMeta.started_at)}</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Last sync</span>
+                <span className="text-[13px] text-[#1C2B33] dark:text-[#ededed]">{formatTime(latestMeta.started_at)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Records</span>
-                <span className="text-[13px] text-[#1C2B33] font-medium">{latestMeta.records}</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Records</span>
+                <span className="text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium">{latestMeta.records}</span>
               </div>
               {latestMeta.error && (
-                <div className="mt-3 p-3 bg-[#FEE7EB] rounded-lg">
+                <div className="mt-3 p-3 bg-[#FEE7EB] dark:bg-[#7F1D1D]/40 rounded-lg">
                   <p className="text-[12px] text-[#E41E3F]">{latestMeta.error}</p>
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-[13px] text-[#8A8D91]">{loading ? "Loading..." : "No sync data yet"}</p>
+            <p className="text-[13px] text-[#8A8D91] dark:text-[#616161]">{loading ? "Loading..." : "No sync data yet"}</p>
           )}
         </div>
 
         {/* Google */}
-        <div className="bg-white rounded-xl border border-[#E4E6EB] p-5">
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-[#E4E6EB] flex items-center justify-center">
-              <span className="text-[#8A8D91] font-bold text-[14px]">G</span>
+            <div className="w-10 h-10 rounded-xl bg-[#E4E6EB] dark:bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+              <span className="text-[#8A8D91] dark:text-[#888888] font-bold text-[14px]">G</span>
             </div>
             <div>
-              <h3 className="text-[15px] font-semibold text-[#1C2B33]">Google Ads</h3>
-              <p className="text-[12px] text-[#8A8D91]">Search, Display & YouTube</p>
+              <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Google Ads</h3>
+              <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Search, Display & YouTube</p>
             </div>
+            <span className="ml-auto text-[11px] font-medium text-[#65676B] dark:text-[#888888] bg-[#F0F2F5] dark:bg-[#1a1a1a] px-2.5 py-0.5 rounded-full">Planned</span>
           </div>
           {latestGoogle ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Status</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Status</span>
                 <StatusLabel status={latestGoogle.status} />
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Last sync</span>
-                <span className="text-[13px] text-[#1C2B33]">{formatTime(latestGoogle.started_at)}</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Last sync</span>
+                <span className="text-[13px] text-[#1C2B33] dark:text-[#ededed]">{formatTime(latestGoogle.started_at)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-[#65676B]">Records</span>
-                <span className="text-[13px] text-[#1C2B33] font-medium">{latestGoogle.records}</span>
+                <span className="text-[13px] text-[#65676B] dark:text-[#888888]">Records</span>
+                <span className="text-[13px] text-[#1C2B33] dark:text-[#ededed] font-medium">{latestGoogle.records}</span>
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Circle className="h-2.5 w-2.5 text-[#8A8D91] fill-current" />
-              <p className="text-[13px] text-[#8A8D91]">{loading ? "Loading..." : "Not connected — future phase"}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <Construction className="h-4 w-4 text-[#F7B928]" />
+              <p className="text-[13px] text-[#8A8D91] dark:text-[#616161]">Integration in pipeline — not yet connected</p>
             </div>
           )}
+        </div>
+
+        {/* Amazon */}
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-[#FF9900] flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-[14px]">A</span>
+            </div>
+            <div>
+              <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Amazon Ads</h3>
+              <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Sponsored Products & Brands</p>
+            </div>
+            <span className="ml-auto text-[11px] font-medium text-[#65676B] dark:text-[#888888] bg-[#F0F2F5] dark:bg-[#1a1a1a] px-2.5 py-0.5 rounded-full">Planned</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Construction className="h-4 w-4 text-[#F7B928]" />
+            <p className="text-[13px] text-[#8A8D91] dark:text-[#616161]">Integration in pipeline — not yet connected</p>
+          </div>
+          <div className="mt-4 pt-4 border-t border-[#E4E6EB] dark:border-[#2a2a2a] space-y-2">
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Will include:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {["Sponsored Products", "Sponsored Brands", "Sponsored Display", "ACOS", "TACOS"].map((tag) => (
+                <span key={tag} className="text-[11px] text-[#65676B] dark:text-[#888888] bg-[#F0F2F5] dark:bg-[#1a1a1a] px-2 py-0.5 rounded-md">{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Flipkart */}
+        <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-[#2874F0] flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-[14px]">F</span>
+            </div>
+            <div>
+              <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Flipkart Ads</h3>
+              <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Product Listing & Smart ROI Ads</p>
+            </div>
+            <span className="ml-auto text-[11px] font-medium text-[#F7B928] bg-[#FFF8E1] dark:bg-[#78350F]/40 px-2.5 py-0.5 rounded-full">Preparing</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Construction className="h-4 w-4 text-[#F7B928]" />
+            <p className="text-[13px] text-[#8A8D91] dark:text-[#616161]">Add credentials to scripts/.env to activate</p>
+          </div>
+          <div className="mt-4 pt-4 border-t border-[#E4E6EB] dark:border-[#2a2a2a] space-y-1.5">
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">Add to scripts/.env:</p>
+            <div className="overflow-x-auto">
+              <code className="block text-[11px] text-[#2874F0] bg-[#EFF6FF] dark:bg-[#0c1a2e] px-3 py-2 rounded-lg font-mono whitespace-pre">
+{`FLIPKART_CLIENT_ID=...
+FLIPKART_CLIENT_SECRET=...`}
+              </code>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Planned Spend */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB]">
-          <h3 className="text-[15px] font-semibold text-[#1C2B33]">Planned Spend</h3>
-          <p className="text-[13px] text-[#65676B] mt-0.5">
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+          <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Planned Spend</h3>
+          <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-0.5">
             Set your weekly ad budget target. Defaults to ₹{DEFAULT_PLANNED_SPEND.toLocaleString("en-IN")} — edit and save per week.
           </p>
         </div>
         {spendLoading ? (
-          <div className="p-5 text-[13px] text-[#8A8D91]">Loading...</div>
+          <div className="p-5 text-[13px] text-[#8A8D91] dark:text-[#616161]">Loading...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
-                <tr className="border-b border-[#E4E6EB] bg-[#F8F9FA]">
-                  <th className="text-left px-5 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Week</th>
-                  <th className="text-left px-5 py-3 text-[12px] font-semibold text-[#65676B] uppercase tracking-wide">Planned Spend (₹)</th>
+                <tr className="border-b border-[#E4E6EB] dark:border-[#2a2a2a] bg-[#F8F9FA] dark:bg-[#161616]">
+                  <th className="text-left px-5 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Week</th>
+                  <th className="text-left px-5 py-3 text-[12px] font-semibold text-[#65676B] dark:text-[#888888] uppercase tracking-wide">Planned Spend (₹)</th>
                   <th className="px-5 py-3"></th>
                 </tr>
               </thead>
@@ -273,12 +324,12 @@ export default function SettingsPage() {
                   const isCurrent = w === currentMondayStr;
                   if (!entry) return null;
                   return (
-                    <tr key={w} className={`border-b border-[#E4E6EB] last:border-0 ${isCurrent ? "bg-[#EBF5FF]/40" : ""}`}>
+                    <tr key={w} className={`border-b border-[#E4E6EB] dark:border-[#2a2a2a] last:border-0 ${isCurrent ? "bg-[#EBF5FF]/40 dark:bg-[#0c1a2e]/20" : "hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c]"}`}>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-[13px] text-[#1C2B33]">{fmtWeekLabel(w)}</span>
+                          <span className="text-[13px] text-[#1C2B33] dark:text-[#ededed]">{fmtWeekLabel(w)}</span>
                           {isCurrent && (
-                            <span className="text-[11px] font-medium text-[#1877F2] bg-[#E7F0FD] px-2 py-0.5 rounded-full">
+                            <span className="text-[11px] font-medium text-[#1877F2] bg-[#E7F0FD] dark:bg-[#0c1a2e] px-2 py-0.5 rounded-full">
                               Current
                             </span>
                           )}
@@ -297,7 +348,7 @@ export default function SettingsPage() {
                             }))
                           }
                           onKeyDown={(e) => e.key === "Enter" && saveWeek(w)}
-                          className="w-40 border border-[#CED0D4] rounded-lg px-3 py-1.5 text-[13px] text-[#1C2B33] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2]"
+                          className="w-40 border border-[#CED0D4] dark:border-[#2a2a2a] rounded-lg px-3 py-1.5 text-[13px] text-[#1C2B33] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:border-[#1877F2] focus:ring-1 focus:ring-[#1877F2]"
                         />
                         {entry.error && (
                           <p className="text-[11px] text-[#E41E3F] mt-1">{entry.error}</p>
@@ -329,16 +380,16 @@ export default function SettingsPage() {
       </div>
 
       {/* Sync history */}
-      <div className="bg-white rounded-xl border border-[#E4E6EB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB]">
-          <h3 className="text-[15px] font-semibold text-[#1C2B33]">Sync History</h3>
+      <div className="bg-white dark:bg-[#111111] rounded-xl border border-[#E4E6EB] dark:border-[#2a2a2a] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+          <h3 className="text-[15px] font-semibold text-[#1C2B33] dark:text-[#ededed]">Sync History</h3>
         </div>
         {loading ? (
-          <div className="p-5 text-[13px] text-[#8A8D91]">Loading...</div>
+          <div className="p-5 text-[13px] text-[#8A8D91] dark:text-[#616161]">Loading...</div>
         ) : logs.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-[13px] text-[#65676B]">No sync history yet</p>
-            <p className="text-[12px] text-[#8A8D91] mt-1">
+            <p className="text-[13px] text-[#65676B] dark:text-[#888888]">No sync history yet</p>
+            <p className="text-[12px] text-[#8A8D91] dark:text-[#616161] mt-1">
               Data will appear after the first GitHub Actions run
             </p>
           </div>
@@ -347,19 +398,19 @@ export default function SettingsPage() {
             {logs.map((log, i) => (
               <div
                 key={log.id}
-                className={`flex items-center justify-between px-5 py-3.5 ${i !== logs.length - 1 ? "border-b border-[#E4E6EB]" : ""} hover:bg-[#F8F9FA] transition-colors`}
+                className={`flex items-center justify-between px-5 py-3.5 ${i !== logs.length - 1 ? "border-b border-[#E4E6EB] dark:border-[#2a2a2a]" : ""} hover:bg-[#F8F9FA] dark:hover:bg-[#1c1c1c] transition-colors`}
               >
                 <div className="flex items-center gap-3">
                   <StatusIcon status={log.status} />
                   <div>
-                    <span className="text-[14px] font-medium text-[#1C2B33] capitalize">
+                    <span className="text-[14px] font-medium text-[#1C2B33] dark:text-[#ededed] capitalize">
                       {log.platform} Ads
                     </span>
-                    <p className="text-[12px] text-[#8A8D91]">{formatTime(log.started_at)}</p>
+                    <p className="text-[12px] text-[#8A8D91] dark:text-[#616161]">{formatTime(log.started_at)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-[13px] text-[#65676B]">{log.records} records</span>
+                  <span className="text-[13px] text-[#65676B] dark:text-[#888888]">{log.records} records</span>
                   <StatusLabel status={log.status} />
                 </div>
               </div>

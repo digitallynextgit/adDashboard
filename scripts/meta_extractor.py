@@ -57,6 +57,14 @@ def _get_video_metric(video_actions: list) -> int:
     return total
 
 
+def _get_avg_watch_time(video_avg_actions: list) -> float:
+    """Extract average watch time in seconds from video_avg_time_watched_actions.
+    Meta returns the value in milliseconds, so we divide by 1000."""
+    for action in (video_avg_actions or []):
+        return round(float(action.get("value", 0)) / 1000, 2)
+    return 0.0
+
+
 def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: str) -> int:
     """Extract per-ad daily insights for a campaign. Returns number of records synced."""
     rows = []
@@ -75,6 +83,7 @@ def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: s
                 "actions",
                 "action_values",
                 "video_thruplay_watched_actions",
+                "video_avg_time_watched_actions",
             ],
             params={
                 "time_range": {"since": start_date, "until": end_date},
@@ -108,6 +117,7 @@ def _extract_ad_level(campaign, campaign_uuid: str, start_date: str, end_date: s
                 "landing_page_views": _get_action_value(actions, {"landing_page_view"}),
                 "video_3s_views": _get_action_value(actions, {"video_view"}),
                 "video_thruplay": _get_video_metric(day.get("video_thruplay_watched_actions", [])),
+                "video_avg_watch_time": _get_avg_watch_time(day.get("video_avg_time_watched_actions", [])),
             })
 
         bulk_upsert_ad_creatives(rows)
@@ -228,6 +238,7 @@ def extract_meta_ads() -> int:
                 "cost_per_action_type",
                 "action_values",
                 "video_thruplay_watched_actions",
+                "video_avg_time_watched_actions",
             ],
             params={
                 "time_range": {"since": start_date, "until": end_date},
@@ -280,6 +291,7 @@ def extract_meta_ads() -> int:
             # Video metrics
             video_3s_views = _get_action_value(actions, {"video_view"})
             video_thruplay = _get_video_metric(day.get("video_thruplay_watched_actions", []))
+            video_avg_watch_time = _get_avg_watch_time(day.get("video_avg_time_watched_actions", []))
 
             upsert_metrics(campaign_uuid, date, {
                 "spend": spend,
@@ -304,6 +316,7 @@ def extract_meta_ads() -> int:
                 "landing_page_views": landing_page_views,
                 "video_thruplay": video_thruplay,
                 "video_3s_views": video_3s_views,
+                "video_avg_watch_time": video_avg_watch_time,
             })
             records_synced += 1
 

@@ -7,7 +7,7 @@ import requests
 from collections import defaultdict
 
 from config import SHOPIFY_STORE_URL, SHOPIFY_ACCESS_TOKEN, LOOKBACK_DAYS
-from db import bulk_upsert_shopify_sales
+from db import bulk_upsert_shopify_sales, bulk_upsert_shopify_variants
 from utils import get_date_range, logger
 
 SHOPIFY_API_VERSION = "2024-10"
@@ -46,6 +46,44 @@ def _fetch_orders(start_date: str, end_date: str):
                 if 'rel="next"' in part:
                     url = part.strip().split(";")[0].strip().strip("<>")
                     break
+
+
+def extract_shopify_variants() -> int:
+    """Fetch all product variants from Shopify and upsert into shopify_variants.
+    Returns number of variants synced."""
+    if not SHOPIFY_STORE_URL or not SHOPIFY_ACCESS_TOKEN:
+        return 0
+
+    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
+    params = {"limit": 250, "fields": "id,title,variants"}
+    rows = []
+
+    while url:
+        resp = requests.get(url, headers=_shopify_headers(), params=params)
+        resp.raise_for_status()
+        for product in resp.json().get("products", []):
+            for v in product.get("variants", []):
+                rows.append({
+                    "variant_id": str(v["id"]),
+                    "product_id": str(product["id"]),
+                    "product_title": product.get("title", ""),
+                    "variant_title": v.get("title") or "",
+                    "sku": v.get("sku") or "",
+                    "price": float(v.get("price", 0)),
+                })
+
+        link = resp.headers.get("Link", "")
+        url = None
+        params = {}
+        if 'rel="next"' in link:
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.strip().split(";")[0].strip().strip("<>")
+                    break
+
+    bulk_upsert_shopify_variants(rows)
+    logger.info(f"Shopify variants sync complete. Variants: {len(rows)}")
+    return len(rows)
 
 
 def extract_shopify_sales() -> int:

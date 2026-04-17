@@ -8,6 +8,10 @@ import { SpendChart } from "@/components/charts/spend-chart";
 import { ConversionsChart } from "@/components/charts/conversions-chart";
 import type { CampaignWithMetrics, DailyMetric } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
+import { usePlatform } from "@/lib/platform-context";
+import { PlatformGate } from "@/components/dashboard/platform-gate";
+import { AmazonOverview } from "@/components/amazon/amazon-overview";
+import { FlipkartOverview } from "@/components/flipkart/flipkart-overview";
 
 interface Totals {
   spend: number;
@@ -20,6 +24,7 @@ interface Totals {
 }
 
 export default function Dashboard() {
+  const { platform, config } = usePlatform();
   const [start, setStart] = useState(() => getDateRange("7d").start);
   const [end,   setEnd]   = useState(() => getDateRange("7d").end);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,25 +80,29 @@ export default function Dashboard() {
     return value.toFixed(0);
   }
 
+  if (!config.connected) return <PlatformGate config={config} />;
+  if (platform === "amazon")   return <AmazonOverview />;
+  if (platform === "flipkart") return <FlipkartOverview />;
+
   return (
     <div className="max-w-300 mx-auto space-y-5">
       {/* Header row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-bold text-meta-dark">
+          <h2 className="text-[20px] font-bold text-meta-dark dark:text-[#ededed]">
             Account Overview
           </h2>
-          <p className="text-[13px] text-[#65676B] mt-0.5">
+          <p className="text-[13px] text-[#65676B] dark:text-[#888888] mt-0.5">
             Performance summary across all campaigns
           </p>
         </div>
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <button
             onClick={() => setRefreshKey(k => k + 1)}
-            className="p-2 rounded-lg border border-[#CED0D4] bg-white hover:bg-meta-sidebar transition-colors"
+            className="p-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#111111] hover:bg-meta-sidebar dark:hover:bg-[#1c1c1c] transition-colors"
             title="Refresh"
           >
-            <RefreshCw className={`h-4 w-4 text-[#65676B] ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 text-[#65676B] dark:text-[#888888] ${loading ? "animate-spin" : ""}`} />
           </button>
           <DateFilter start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
         </div>
@@ -143,10 +152,10 @@ export default function Dashboard() {
       {/* Campaign table */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[16px] font-semibold text-meta-dark">
+          <h3 className="text-[16px] font-semibold text-meta-dark dark:text-[#ededed]">
             Campaigns
           </h3>
-          <span className="text-[13px] text-[#65676B]">
+          <span className="text-[13px] text-[#65676B] dark:text-[#888888]">
             {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""}
           </span>
         </div>
