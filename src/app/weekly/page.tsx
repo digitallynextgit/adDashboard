@@ -236,7 +236,7 @@ function FunnelSection({ title, children }: { title: string; children: React.Rea
 }
 
 export default function WeeklyReportPage() {
-  const { config } = usePlatform();
+  const { platform, config } = usePlatform();
   const [weeks, setWeeks] = useState<WeekSummary[]>([]);
   const [creatives, setCreatives] = useState<CreativeData[]>([]);
   const [ageGender, setAgeGender] = useState<AudienceRow[]>([]);

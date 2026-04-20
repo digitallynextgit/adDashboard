@@ -9,11 +9,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import type { DailyMetric } from "@/lib/types";
 import { useTheme } from "@/lib/theme-context";
 
 interface SpendChartProps {
-  data: DailyMetric[];
+  data: { date: string; spend: number }[];
   loading: boolean;
 }
 

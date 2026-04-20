@@ -12,7 +12,7 @@ import { AmazonOverview } from "@/components/amazon/amazon-overview";
 import { FlipkartOverview } from "@/components/flipkart/flipkart-overview";
 
 export default function CampaignsPage() {
-  const { config } = usePlatform();
+  const { platform, config } = usePlatform();
   const [start, setStart] = useState(() => getDateRange("7d").start);
   const [end,   setEnd]   = useState(() => getDateRange("7d").end);
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
