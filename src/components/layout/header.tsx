@@ -1,7 +1,8 @@
 "use client";
 
-import { Menu, Sun, Moon } from "lucide-react";
+import { Menu, Sun, Moon, LogOut } from "lucide-react";
 import { useTheme } from "@/lib/theme-context";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -9,6 +10,13 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { theme, toggle } = useTheme();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header className="h-14 bg-white dark:bg-[#111111] border-b border-[#E4E6EB] dark:border-[#2a2a2a] px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
@@ -24,17 +32,26 @@ export function Header({ onMenuClick }: HeaderProps) {
           Ads Reporting
         </h2>
       </div>
-      <button
-        onClick={toggle}
-        className="p-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] hover:bg-[#F0F2F5] dark:hover:bg-[#2a2a2a] transition-colors"
-        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        {theme === "dark" ? (
-          <Sun className="h-4 w-4 text-[#F7B928]" />
-        ) : (
-          <Moon className="h-4 w-4 text-[#65676B]" />
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={toggle}
+          className="p-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] hover:bg-[#F0F2F5] dark:hover:bg-[#2a2a2a] transition-colors"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 text-[#F7B928]" />
+          ) : (
+            <Moon className="h-4 w-4 text-[#65676B]" />
+          )}
+        </button>
+        <button
+          onClick={handleLogout}
+          className="p-2 rounded-lg border border-[#CED0D4] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] hover:bg-[#F0F2F5] dark:hover:bg-[#2a2a2a] transition-colors"
+          title="Sign out"
+        >
+          <LogOut className="h-4 w-4 text-[#65676B] dark:text-[#888888]" />
+        </button>
+      </div>
     </header>
   );
 }
