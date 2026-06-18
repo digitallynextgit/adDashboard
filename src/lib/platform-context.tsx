@@ -16,11 +16,12 @@ export interface PlatformConfig {
   status: PlatformStatus;
 }
 
+// Amazon Ads and Flipkart Ads have been moved out of the PLATFORM switcher
+// and into the Integrations page. The Platform type still includes their IDs
+// so existing code paths (api routes, type guards) don't need to change.
 export const PLATFORMS: PlatformConfig[] = [
-  { id: "meta",     label: "Meta Ads",     description: "Facebook & Instagram", color: "#1877F2", initial: "M", connected: true,  status: "connected"  },
-  { id: "google",   label: "Google Ads",   description: "Search & YouTube",     color: "#EA4335", initial: "G", connected: false, status: "planned"    },
-  { id: "amazon",   label: "Amazon Ads",   description: "Sponsored Products",   color: "#FF9900", initial: "A", connected: true,  status: "connected"  },
-  { id: "flipkart", label: "Flipkart Ads", description: "Product & Display Ads",color: "#2874F0", initial: "F", connected: true,  status: "preparing"  },
+  { id: "meta",   label: "Meta Ads",   description: "Facebook & Instagram", color: "#1877F2", initial: "M", connected: true,  status: "connected" },
+  { id: "google", label: "Google Ads", description: "Search & YouTube",     color: "#EA4335", initial: "G", connected: false, status: "planned"   },
 ];
 
 interface PlatformContextValue {

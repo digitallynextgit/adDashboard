@@ -11,6 +11,10 @@ from meta_extractor import extract_meta_ads
 from shopify_extractor import extract_shopify_sales, extract_shopify_variants
 from amazon_extractor import extract_amazon_ads
 from flipkart_extractor import extract_flipkart_ads
+from ga4_extractor import extract_ga4
+from gsc_extractor import extract_gsc
+from gokwik_extractor import extract_gokwik
+from clarity_extractor import extract_clarity
 
 
 def run_meta():
@@ -104,6 +108,52 @@ def main():
     except Exception as e:
         errors.append(f"Flipkart: {e}")
         log_sync(platform="flipkart", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
+
+    # H2S analytics extractors — each skips gracefully if creds missing.
+
+    try:
+        started_at = now_iso()
+        records = extract_ga4()
+        if records > 0:
+            log_sync(platform="ga4", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"GA4: {e}")
+        log_sync(platform="ga4", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
+
+    try:
+        started_at = now_iso()
+        records = extract_gsc()
+        if records > 0:
+            log_sync(platform="gsc", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"GSC: {e}")
+        log_sync(platform="gsc", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
+
+    try:
+        started_at = now_iso()
+        records = extract_gokwik()
+        if records > 0:
+            log_sync(platform="gokwik", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"GoKwik: {e}")
+        log_sync(platform="gokwik", status="failed", records=0,
+                 error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
+
+    try:
+        started_at = now_iso()
+        records = extract_clarity()
+        if records > 0:
+            log_sync(platform="clarity", status="success", records=records,
+                     error=None, started_at=started_at, finished_at=now_iso())
+    except Exception as e:
+        errors.append(f"Clarity: {e}")
+        log_sync(platform="clarity", status="failed", records=0,
                  error=type(e).__name__, started_at=now_iso(), finished_at=now_iso())
 
     # Google Ads extraction will be added in a future phase

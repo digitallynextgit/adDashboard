@@ -2,3 +2,9 @@ facebook-business>=25.0.0
 supabase>=2.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
+
+# H2S pilot — optional extractors. Extractors skip gracefully if creds missing,
+# but the SDKs must still be importable when the extractor is invoked.
+google-analytics-data>=0.18.0
+google-api-python-client>=2.130.0
+google-auth>=2.30.0

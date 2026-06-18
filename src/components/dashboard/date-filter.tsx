@@ -36,12 +36,13 @@ function fmtShort(s: string): string {
 
 // ─── presets ──────────────────────────────────────────────────────────────────
 
-export type DateRange = "7d" | "14d" | "30d" | "this_month" | "last_month";
+export type DateRange = "7d" | "14d" | "30d" | "60d" | "this_month" | "last_month";
 
 const PRESETS: { value: DateRange; label: string }[] = [
   { value: "7d",         label: "Last 7 days"  },
   { value: "14d",        label: "Last 14 days" },
   { value: "30d",        label: "Last 30 days" },
+  { value: "60d",        label: "Last 60 days" },
   { value: "this_month", label: "This Month"   },
   { value: "last_month", label: "Last Month"   },
 ];
@@ -53,6 +54,7 @@ export function getDateRange(range: DateRange): { start: string; end: string } {
     case "7d":  return { start: addDays(end, -7),  end };
     case "14d": return { start: addDays(end, -14), end };
     case "30d": return { start: addDays(end, -30), end };
+    case "60d": return { start: addDays(end, -60), end };
     case "this_month":
       return { start: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), end };
     case "last_month": {

@@ -13,6 +13,6 @@ if (!password) {
 const salt = randomBytes(16).toString("hex");
 const hash = scryptSync(password, salt, 64).toString("hex");
 
-// console.log(`\nYour password hash (add this to .env.local):\n`);
-// console.log(`AUTH_PASSWORD_HASH=${salt}:${hash}`);
-// console.log(`\nDone. Keep your password safe — you won't be able to recover it from the hash.\n`);
+console.log(`\nYour password hash (add this to .env.local):\n`);
+console.log(`AUTH_PASSWORD_HASH=${salt}:${hash}`);
+console.log(`\nDone. Keep your password safe — you won't be able to recover it from the hash.\n`);

@@ -43,6 +43,11 @@ __pycache__/
 *.pyc
 scripts/.env
 
+# service-account keys (NEVER commit)
+*service-account*.json
+scripts/ga4*.json
+scripts/*-credentials.json
+
 # vercel
 .vercel
 

@@ -7,17 +7,20 @@ import {
   Settings,
   Megaphone,
   CalendarRange,
+  Sparkles,
   X,
   Lock,
   Construction,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlatform, PLATFORMS, type Platform } from "@/lib/platform-context";
+import { SERVICES } from "@/lib/integrations";
 
 const navItems = [
   { href: "/",          label: "Overview",     icon: LayoutDashboard, platforms: null        },
   { href: "/campaigns", label: "Campaigns",    icon: Megaphone,       platforms: ["meta"]    },
   { href: "/weekly",    label: "Weekly Report",icon: CalendarRange,   platforms: ["meta"]    },
+  { href: "/h2s",       label: "H2S Pilot",    icon: Sparkles,        platforms: null        },
   { href: "/settings",  label: "Sync Status",  icon: Settings,        platforms: null        },
 ];
 // platforms: null  = show for all platforms
@@ -116,6 +119,48 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                  isActive    ? <div className="w-1.5 h-1.5 rounded-full bg-[#1877F2] flex-shrink-0" /> :
                  null}
               </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Integrations (one entry per data source) */}
+      <div className="px-3 py-3 border-b border-[#E4E6EB] dark:border-[#2a2a2a]">
+        <p className="text-[10px] font-semibold text-[#8A8D91] dark:text-[#616161] uppercase tracking-widest px-1 mb-2">
+          Integrations
+        </p>
+        <div className="space-y-0.5">
+          {SERVICES.map((s) => {
+            const href = `/integrations/${s.id}`;
+            const isActive = pathname === href;
+            return (
+              <a
+                key={s.id}
+                href={href}
+                onClick={onClose}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors",
+                  isActive
+                    ? "bg-[#EBF5FF] dark:bg-[#0c1a2e]"
+                    : "hover:bg-[#F0F2F5] dark:hover:bg-[#1c1c1c]"
+                )}
+              >
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
+                  style={{ backgroundColor: s.color }}
+                >
+                  {s.initial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={cn(
+                    "text-[13px] font-medium truncate",
+                    isActive ? "text-[#1877F2]" : "text-[#1C2B33] dark:text-[#ededed]"
+                  )}>
+                    {s.label}
+                  </div>
+                </div>
+                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[#1877F2] flex-shrink-0" />}
+              </a>
             );
           })}
         </div>
